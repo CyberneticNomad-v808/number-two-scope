@@ -99,7 +99,8 @@ class SpiderFootHelpers:
     # Copy the implementation of SpiderFootHelpers from the original location
     pass
 
-    def logPath(self) -> str:
+    @staticmethod
+    def logPath() -> str:
         """
         Return the path to the log directory.
         

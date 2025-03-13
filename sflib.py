@@ -14,6 +14,7 @@ import hashlib
 import inspect
 import io
 import json
+import logging
 import os
 import random
 import re
@@ -24,6 +25,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from copy import deepcopy
 from datetime import datetime
 
 import cryptography
@@ -34,68 +36,9 @@ import requests
 import urllib3
 from publicsuffixlist import PublicSuffixList
 from spiderfoot import SpiderFootHelpers
-from spiderfoot.logger import logWorkerSetup
-from spiderfoot.logconfig import get_module_logger
 
 # For hiding the SSL warnings coming from the requests lib
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # noqa: DUO131
-
-# Initialize the custom logger
-import multiprocessing
-
-loggingQueue = multiprocessing.Queue()
-logWorkerSetup(loggingQueue)
-log = get_module_logger(__name__)
-
-
-def safe_deepcopy(obj):
-    """
-    Safely deep copy an object, handling non-picklable objects like thread locks.
-
-    Args:
-        obj: The object to copy
-
-    Returns:
-        A deep copy of the object with non-picklable items removed or handled
-    """
-    if isinstance(obj, dict):
-        return {
-            k: safe_deepcopy(v)
-            for k, v in obj.items()
-            if not str(type(v)).find("_thread.lock") > -1
-        }
-    elif isinstance(obj, list):
-        return [safe_deepcopy(i) for i in obj]
-    elif isinstance(obj, tuple):
-        return tuple(safe_deepcopy(i) for i in obj)
-    elif isinstance(obj, set):
-        return {safe_deepcopy(i) for i in obj}
-    elif hasattr(obj, "__dict__") and not callable(obj):
-        # For custom objects that aren't functions/methods
-        try:
-            from copy import deepcopy
-
-            return deepcopy(obj)
-        except TypeError:
-            # If the object can't be deepcopied, return a new instance
-            # with copied attributes where possible
-            cls = obj.__class__
-            result = cls.__new__(cls)
-            for k, v in obj.__dict__.items():
-                if not str(type(v)).find("_thread.lock") > -1:
-                    try:
-                        setattr(result, k, safe_deepcopy(v))
-                    except (TypeError, AttributeError):
-                        setattr(result, k, None)
-            return result
-    else:
-        # For primitive types or types we don't need to copy
-        try:
-            from copy import deepcopy
-
-            return deepcopy(obj)
-        except TypeError:
-            return obj
 
 
 class SpiderFoot:
@@ -107,7 +50,6 @@ class SpiderFoot:
         socksProxy (str): SOCKS proxy
         opts (dict): configuration options
     """
-
     _dbh = None
     _scanId = None
     _socksProxy = None
@@ -125,26 +67,17 @@ class SpiderFoot:
         if not isinstance(options, dict):
             raise TypeError(f"options is {type(options)}; expected dict()")
 
-        self.opts = safe_deepcopy(options)
-        self.log = get_module_logger(__name__)
-        self.log.debug(f"Initializing SpiderFoot with options: {options}")
+        self.opts = deepcopy(options)
+        self.log = logging.getLogger(f"spiderfoot.{__name__}")
 
         # This is ugly but we don't want any fetches to fail - we expect
         # to encounter unverified SSL certs!
         ssl._create_default_https_context = ssl._create_unverified_context  # noqa: DUO122
 
-        if self.opts.get("_dnsserver", "") != "":
+        if self.opts.get('_dnsserver', "") != "":
             res = dns.resolver.Resolver()
-            res.nameservers = [self.opts["_dnsserver"]]
+            res.nameservers = [self.opts['_dnsserver']]
             dns.resolver.override_system_resolver(res)
-
-        # Set the socksProxy attribute based on the options
-        if (
-            self.opts.get("_socks1type") and
-            self.opts.get("_socks2addr") and
-            self.opts.get("_socks3port")
-        ):
-            self.socksProxy = f"socks{self.opts['_socks1type']}://{self.opts['_socks2addr']}:{self.opts['_socks3port']}"
 
     @property
     def dbh(self):
@@ -222,8 +155,8 @@ class SpiderFoot:
             self.error(f"Invalid option value {val}")
             return None
 
-        if val.startswith("@"):
-            fname = val.split("@")[1]
+        if val.startswith('@'):
+            fname = val.split('@')[1]
             self.info(f"Loading configuration data from: {fname}")
 
             try:
@@ -233,13 +166,13 @@ class SpiderFoot:
                 self.error(f"Unable to open option file, {fname}: {e}")
                 return None
 
-        if val.lower().startswith("http://") or val.lower().startswith("https://"):
+        if val.lower().startswith('http://') or val.lower().startswith('https://'):
             try:
                 self.info(f"Downloading configuration data from: {val}")
                 session = self.getSession()
                 res = session.get(val)
 
-                return res.content.decode("utf-8")
+                return res.content.decode('utf-8')
             except Exception as e:
                 self.error(f"Unable to open option URL, {val}: {e}")
                 return None
@@ -252,10 +185,10 @@ class SpiderFoot:
         Args:
             message (str): error message
         """
-        if not self.opts["__logging"]:
+        if not self.opts['__logging']:
             return
 
-        self.log.error(message, extra={"scanId": self._scanId})
+        self.log.error(message, extra={'scanId': self._scanId})
 
     def fatal(self, error: str) -> None:
         """Print an error message and stacktrace then exit.
@@ -263,7 +196,7 @@ class SpiderFoot:
         Args:
             error (str): error message
         """
-        self.log.critical(error, extra={"scanId": self._scanId})
+        self.log.critical(error, extra={'scanId': self._scanId})
 
         print(str(inspect.stack()))
 
@@ -275,10 +208,10 @@ class SpiderFoot:
         Args:
             message (str): status message
         """
-        if not self.opts["__logging"]:
+        if not self.opts['__logging']:
             return
 
-        self.log.info(message, extra={"scanId": self._scanId})
+        self.log.info(message, extra={'scanId': self._scanId})
 
     def info(self, message: str) -> None:
         """Log and print an info message.
@@ -286,10 +219,10 @@ class SpiderFoot:
         Args:
             message (str): info message
         """
-        if not self.opts["__logging"]:
+        if not self.opts['__logging']:
             return
 
-        self.log.info(f"{message}", extra={"scanId": self._scanId})
+        self.log.info(f"{message}", extra={'scanId': self._scanId})
 
     def debug(self, message: str) -> None:
         """Log and print a debug message.
@@ -297,12 +230,12 @@ class SpiderFoot:
         Args:
             message (str): debug message
         """
-        if not self.opts["_debug"]:
+        if not self.opts['_debug']:
             return
-        if not self.opts["__logging"]:
+        if not self.opts['__logging']:
             return
 
-        self.log.debug(f"{message}", extra={"scanId": self._scanId})
+        self.log.debug(f"{message}", extra={'scanId': self._scanId})
 
     def hashstring(self, string: str) -> str:
         """Returns a SHA256 hash of the specified input.
@@ -316,7 +249,7 @@ class SpiderFoot:
         s = string
         if type(string) in [list, dict]:
             s = str(string)
-        return hashlib.sha256(s.encode("raw_unicode_escape")).hexdigest()
+        return hashlib.sha256(s.encode('raw_unicode_escape')).hexdigest()
 
     def cachePut(self, label: str, data: str) -> None:
         """Store data to the cache.
@@ -325,7 +258,7 @@ class SpiderFoot:
             label (str): Name of the cached data to be used when retrieving the cached data.
             data (str): Data to cache
         """
-        pathLabel = hashlib.sha224(label.encode("utf-8")).hexdigest()
+        pathLabel = hashlib.sha224(label.encode('utf-8')).hexdigest()
         cacheFile = SpiderFootHelpers.cachePath() + "/" + pathLabel
         with io.open(cacheFile, "w", encoding="utf-8", errors="ignore") as fp:
             if isinstance(data, list):
@@ -334,9 +267,9 @@ class SpiderFoot:
                         fp.write(line)
                         fp.write("\n")
                     else:
-                        fp.write(line.decode("utf-8") + "\n")
+                        fp.write(line.decode('utf-8') + '\n')
             elif isinstance(data, bytes):
-                fp.write(data.decode("utf-8"))
+                fp.write(data.decode('utf-8'))
             else:
                 fp.write(data)
 
@@ -354,7 +287,7 @@ class SpiderFoot:
         if not label:
             return None
 
-        pathLabel = hashlib.sha224(label.encode("utf-8")).hexdigest()
+        pathLabel = hashlib.sha224(label.encode('utf-8')).hexdigest()
         cacheFile = SpiderFootHelpers.cachePath() + "/" + pathLabel
         try:
             cache_stat = os.stat(cacheFile)
@@ -365,7 +298,7 @@ class SpiderFoot:
             return None
 
         if cache_stat.st_mtime > time.time() - timeoutHrs * 3600 or timeoutHrs == 0:
-            with open(cacheFile, "r", encoding="utf-8") as fp:
+            with open(cacheFile, "r", encoding='utf-8') as fp:
                 return fp.read()
 
         return None
@@ -393,7 +326,7 @@ class SpiderFoot:
 
         for opt in list(opts.keys()):
             # Filter out system temporary variables like GUID and others
-            if opt.startswith("__") and filterSystem:
+            if opt.startswith('__') and filterSystem:
                 continue
 
             if isinstance(opts[opt], (int, str)):
@@ -405,23 +338,21 @@ class SpiderFoot:
                 else:
                     storeopts[opt] = 0
             if isinstance(opts[opt], list):
-                storeopts[opt] = ",".join(opts[opt])
+                storeopts[opt] = ','.join(opts[opt])
 
-        if "__modules__" not in opts:
+        if '__modules__' not in opts:
             return storeopts
 
-        if not isinstance(opts["__modules__"], dict):
-            raise TypeError(
-                f"opts['__modules__'] is {type(opts['__modules__'])}; expected dict()"
-            )
+        if not isinstance(opts['__modules__'], dict):
+            raise TypeError(f"opts['__modules__'] is {type(opts['__modules__'])}; expected dict()")
 
-        for mod in opts["__modules__"]:
-            for opt in opts["__modules__"][mod]["opts"]:
-                if opt.startswith("_") and filterSystem:
+        for mod in opts['__modules__']:
+            for opt in opts['__modules__'][mod]['opts']:
+                if opt.startswith('_') and filterSystem:
                     continue
 
                 mod_opt = f"{mod}:{opt}"
-                mod_opt_val = opts["__modules__"][mod]["opts"][opt]
+                mod_opt_val = opts['__modules__'][mod]['opts'][opt]
 
                 if isinstance(mod_opt_val, (int, str)):
                     storeopts[mod_opt] = mod_opt_val
@@ -432,13 +363,11 @@ class SpiderFoot:
                     else:
                         storeopts[mod_opt] = 0
                 if isinstance(mod_opt_val, list):
-                    storeopts[mod_opt] = ",".join(str(x) for x in mod_opt_val)
+                    storeopts[mod_opt] = ','.join(str(x) for x in mod_opt_val)
 
         return storeopts
 
-    def configUnserialize(
-        self, opts: dict, referencePoint: dict, filterSystem: bool = True
-    ):
+    def configUnserialize(self, opts: dict, referencePoint: dict, filterSystem: bool = True):
         """Take strings, etc. from the database or UI and convert them
         to a dictionary for Python to process.
 
@@ -457,15 +386,13 @@ class SpiderFoot:
         if not isinstance(opts, dict):
             raise TypeError(f"opts is {type(opts)}; expected dict()")
         if not isinstance(referencePoint, dict):
-            raise TypeError(
-                f"referencePoint is {type(referencePoint)}; expected dict()"
-            )
+            raise TypeError(f"referencePoint is {type(referencePoint)}; expected dict()")
 
         returnOpts = referencePoint
 
         # Global options
         for opt in list(referencePoint.keys()):
-            if opt.startswith("__") and filterSystem:
+            if opt.startswith('__') and filterSystem:
                 # Leave out system variables
                 continue
 
@@ -495,53 +422,43 @@ class SpiderFoot:
                 else:
                     returnOpts[opt] = str(opts[opt]).split(",")
 
-        if "__modules__" not in referencePoint:
+        if '__modules__' not in referencePoint:
             return returnOpts
 
-        if not isinstance(referencePoint["__modules__"], dict):
-            raise TypeError(
-                f"referencePoint['__modules__'] is {type(referencePoint['__modules__'])}; expected dict()"
-            )
+        if not isinstance(referencePoint['__modules__'], dict):
+            raise TypeError(f"referencePoint['__modules__'] is {type(referencePoint['__modules__'])}; expected dict()")
 
         # Module options
         # A lot of mess to handle typing..
-        for modName in referencePoint["__modules__"]:
-            for opt in referencePoint["__modules__"][modName]["opts"]:
-                if opt.startswith("_") and filterSystem:
+        for modName in referencePoint['__modules__']:
+            for opt in referencePoint['__modules__'][modName]['opts']:
+                if opt.startswith('_') and filterSystem:
                     continue
 
                 if modName + ":" + opt in opts:
-                    ref_mod = referencePoint["__modules__"][modName]["opts"][opt]
+                    ref_mod = referencePoint['__modules__'][modName]['opts'][opt]
                     if isinstance(ref_mod, bool):
                         if opts[modName + ":" + opt] == "1":
-                            returnOpts["__modules__"][modName]["opts"][opt] = True
+                            returnOpts['__modules__'][modName]['opts'][opt] = True
                         else:
-                            returnOpts["__modules__"][modName]["opts"][opt] = False
+                            returnOpts['__modules__'][modName]['opts'][opt] = False
                         continue
 
                     if isinstance(ref_mod, str):
-                        returnOpts["__modules__"][modName]["opts"][opt] = str(
-                            opts[modName + ":" + opt]
-                        )
+                        returnOpts['__modules__'][modName]['opts'][opt] = str(opts[modName + ":" + opt])
                         continue
 
                     if isinstance(ref_mod, int):
-                        returnOpts["__modules__"][modName]["opts"][opt] = int(
-                            opts[modName + ":" + opt]
-                        )
+                        returnOpts['__modules__'][modName]['opts'][opt] = int(opts[modName + ":" + opt])
                         continue
 
                     if isinstance(ref_mod, list):
                         if isinstance(ref_mod[0], int):
-                            returnOpts["__modules__"][modName]["opts"][opt] = list()
+                            returnOpts['__modules__'][modName]['opts'][opt] = list()
                             for x in str(opts[modName + ":" + opt]).split(","):
-                                returnOpts["__modules__"][modName]["opts"][opt].append(
-                                    int(x)
-                                )
+                                returnOpts['__modules__'][modName]['opts'][opt].append(int(x))
                         else:
-                            returnOpts["__modules__"][modName]["opts"][opt] = str(
-                                opts[modName + ":" + opt]
-                            ).split(",")
+                            returnOpts['__modules__'][modName]['opts'][opt] = str(opts[modName + ":" + opt]).split(",")
 
         return returnOpts
 
@@ -559,13 +476,13 @@ class SpiderFoot:
         if not events:
             return modlist
 
-        loaded_modules = self.opts.get("__modules__")
+        loaded_modules = self.opts.get('__modules__')
 
         if not loaded_modules:
             return modlist
 
         for mod in list(loaded_modules.keys()):
-            provides = loaded_modules[mod].get("provides")
+            provides = loaded_modules[mod].get('provides')
 
             if not provides:
                 continue
@@ -593,13 +510,13 @@ class SpiderFoot:
         if not events:
             return modlist
 
-        loaded_modules = self.opts.get("__modules__")
+        loaded_modules = self.opts.get('__modules__')
 
         if not loaded_modules:
             return modlist
 
         for mod in list(loaded_modules.keys()):
-            consumes = loaded_modules[mod].get("consumes")
+            consumes = loaded_modules[mod].get('consumes')
 
             if not consumes:
                 continue
@@ -628,14 +545,14 @@ class SpiderFoot:
         if not modules:
             return evtlist
 
-        loaded_modules = self.opts.get("__modules__")
+        loaded_modules = self.opts.get('__modules__')
 
         if not loaded_modules:
             return evtlist
 
         for mod in modules:
             if mod in list(loaded_modules.keys()):
-                provides = loaded_modules[mod].get("provides")
+                provides = loaded_modules[mod].get('provides')
                 if provides:
                     for evt in provides:
                         evtlist.append(evt)
@@ -656,14 +573,14 @@ class SpiderFoot:
         if not modules:
             return evtlist
 
-        loaded_modules = self.opts.get("__modules__")
+        loaded_modules = self.opts.get('__modules__')
 
         if not loaded_modules:
             return evtlist
 
         for mod in modules:
             if mod in list(loaded_modules.keys()):
-                consumes = loaded_modules[mod].get("consumes")
+                consumes = loaded_modules[mod].get('consumes')
                 if consumes:
                     for evt in consumes:
                         evtlist.append(evt)
@@ -684,13 +601,13 @@ class SpiderFoot:
             return None
 
         baseurl = SpiderFootHelpers.urlBaseUrl(url)
-        if "://" in baseurl:
+        if '://' in baseurl:
             count = 2
         else:
             count = 0
 
         # http://abc.com will split to ['http:', '', 'abc.com']
-        return baseurl.split("/")[count].lower()
+        return baseurl.split('/')[count].lower()
 
     def domainKeyword(self, domain: str, tldList: list) -> str:
         """Extract the keyword (the domain without the TLD or any subdomains) from a domain.
@@ -711,12 +628,12 @@ class SpiderFoot:
         if not dom:
             return None
 
-        tld = ".".join(dom.split(".")[1:])
-        ret = domain.lower().replace("." + tld, "")
+        tld = '.'.join(dom.split('.')[1:])
+        ret = domain.lower().replace('.' + tld, '')
 
         # If the user supplied a domain with a sub-domain, return the second part
-        if "." in ret:
-            return ret.split(".")[-1]
+        if '.' in ret:
+            return ret.split('.')[-1]
 
         return ret
 
@@ -846,7 +763,7 @@ class SpiderFoot:
         if not isinstance(cidr, str):
             return False
 
-        if "/" not in cidr:
+        if '/' not in cidr:
             return False
 
         try:
@@ -854,7 +771,7 @@ class SpiderFoot:
         except Exception:
             return False
 
-    def isPublicIpAddress(ip):
+    def isPublicIpAddress(self, ip: str) -> bool:
         """Check if an IP address is public.
 
         Args:
@@ -863,20 +780,23 @@ class SpiderFoot:
         Returns:
             bool: IP address is public
         """
-        try:
-            # Import inside the function to avoid import errors in tests
-            from netaddr import IPAddress
-            
-            if not isinstance(ip, IPAddress):
-                ip_obj = IPAddress(ip)
-            else:
-                ip_obj = ip
-                
-            if ip_obj.is_private() or ip_obj.is_loopback() or ip_obj.is_reserved():
-                return False
-            return True
-        except Exception:
+        if not isinstance(ip, (str, netaddr.IPAddress)):
             return False
+        if not self.validIP(ip) and not self.validIP6(ip):
+            return False
+
+        if not netaddr.IPAddress(ip).is_unicast():
+            return False
+
+        if netaddr.IPAddress(ip).is_loopback():
+            return False
+        if netaddr.IPAddress(ip).is_reserved():
+            return False
+        if netaddr.IPAddress(ip).is_multicast():
+            return False
+        if netaddr.IPAddress(ip).is_private():
+            return False
+        return True
 
     def normalizeDNS(self, res: list) -> list:
         """Clean DNS results to be a simple list
@@ -943,8 +863,7 @@ class SpiderFoot:
         """
 
         if not self.validIP(ipaddr) and not self.validIP6(ipaddr):
-            self.error(
-                f"Unable to reverse resolve {ipaddr} (Invalid IP address)")
+            self.error(f"Unable to reverse resolve {ipaddr} (Invalid IP address)")
             return list()
 
         self.debug(f"Performing reverse resolve of {ipaddr}")
@@ -1013,9 +932,7 @@ class SpiderFoot:
         elif self.validIP6(ip):
             addrs = self.resolveHost6(host)
         else:
-            self.error(
-                f"Unable to verify hostname {host} resolves to {ip} (Invalid IP address)"
-            )
+            self.error(f"Unable to verify hostname {host} resolves to {ip} (Invalid IP address)")
             return False
 
         if not addrs:
@@ -1023,7 +940,7 @@ class SpiderFoot:
 
         return any(str(addr) == ip for addr in addrs)
 
-    def safeSocket(self, host: str, port: int, timeout: int) -> "ssl.SSLSocket":
+    def safeSocket(self, host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
         """Create a safe socket that's using SOCKS/TOR if it was enabled.
 
         Args:
@@ -1038,7 +955,7 @@ class SpiderFoot:
         sock.settimeout(int(timeout))
         return sock
 
-    def safeSSLSocket(self, host: str, port: int, timeout: int) -> "ssl.SSLSocket":
+    def safeSSLSocket(self, host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
         """Create a safe SSL connection that's using SOCKs/TOR if it was enabled.
 
         Args:
@@ -1074,90 +991,76 @@ class SpiderFoot:
             return None
 
         ret = dict()
-        if "\r" in rawcert:
-            rawcert = rawcert.replace("\r", "")
+        if '\r' in rawcert:
+            rawcert = rawcert.replace('\r', '')
         if isinstance(rawcert, str):
-            rawcert = rawcert.encode("utf-8")
+            rawcert = rawcert.encode('utf-8')
 
         from cryptography.hazmat.backends.openssl import backend
-
         cert = cryptography.x509.load_pem_x509_certificate(rawcert, backend)
-        sslcert = OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_PEM, rawcert)
-        sslcert_dump = OpenSSL.crypto.dump_certificate(
-            OpenSSL.crypto.FILETYPE_TEXT, sslcert
-        )
+        sslcert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, rawcert)
+        sslcert_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_TEXT, sslcert)
 
-        ret["text"] = sslcert_dump.decode("utf-8", errors="replace")
-        ret["issuer"] = str(cert.issuer)
-        ret["altnames"] = list()
-        ret["expired"] = False
-        ret["expiring"] = False
-        ret["mismatch"] = False
-        ret["certerror"] = False
-        ret["issued"] = str(cert.subject)
+        ret['text'] = sslcert_dump.decode('utf-8', errors='replace')
+        ret['issuer'] = str(cert.issuer)
+        ret['altnames'] = list()
+        ret['expired'] = False
+        ret['expiring'] = False
+        ret['mismatch'] = False
+        ret['certerror'] = False
+        ret['issued'] = str(cert.subject)
 
         # Expiry info
         try:
-            notafter = datetime.strptime(
-                sslcert.get_notAfter().decode("utf-8"), "%Y%m%d%H%M%SZ"
-            )
-            ret["expiry"] = int(notafter.strftime("%s"))
-            ret["expirystr"] = notafter.strftime("%Y-%m-%d %H:%M:%S")
+            notafter = datetime.strptime(sslcert.get_notAfter().decode('utf-8'), "%Y%m%d%H%M%SZ")
+            ret['expiry'] = int(notafter.strftime("%s"))
+            ret['expirystr'] = notafter.strftime("%Y-%m-%d %H:%M:%S")
             now = int(time.time())
             warnexp = now + (expiringdays * 86400)
-            if ret["expiry"] <= warnexp:
-                ret["expiring"] = True
-            if ret["expiry"] <= now:
-                ret["expired"] = True
+            if ret['expiry'] <= warnexp:
+                ret['expiring'] = True
+            if ret['expiry'] <= now:
+                ret['expired'] = True
         except Exception as e:
             self.error(f"Error processing date in certificate: {e}")
-            ret["certerror"] = True
+            ret['certerror'] = True
             return ret
 
         # SANs
         try:
-            ext = cert.extensions.get_extension_for_class(
-                cryptography.x509.SubjectAlternativeName
-            )
+            ext = cert.extensions.get_extension_for_class(cryptography.x509.SubjectAlternativeName)
             for x in ext.value:
                 if isinstance(x, cryptography.x509.DNSName):
-                    ret["altnames"].append(
-                        x.value.lower()
-                        .encode("raw_unicode_escape")
-                        .decode("ascii", errors="replace")
-                    )
+                    ret['altnames'].append(x.value.lower().encode('raw_unicode_escape').decode("ascii", errors='replace'))
         except Exception as e:
             self.debug(f"Problem processing certificate: {e}")
 
         certhosts = list()
         try:
-            attrs = cert.subject.get_attributes_for_oid(
-                cryptography.x509.oid.NameOID.COMMON_NAME
-            )
+            attrs = cert.subject.get_attributes_for_oid(cryptography.x509.oid.NameOID.COMMON_NAME)
 
             if len(attrs) == 1:
                 name = attrs[0].value.lower()
                 # CN often duplicates one of the SANs, don't add it then
-                if name not in ret["altnames"]:
+                if name not in ret['altnames']:
                     certhosts.append(name)
         except Exception as e:
             self.debug(f"Problem processing certificate: {e}")
 
         # Check for mismatch
-        if fqdn and ret["issued"]:
+        if fqdn and ret['issued']:
             fqdn = fqdn.lower()
 
             try:
                 # Extract the CN from the issued section
-                if "cn=" + fqdn in ret["issued"].lower():
+                if "cn=" + fqdn in ret['issued'].lower():
                     certhosts.append(fqdn)
 
                 # Extract subject alternative names
-                for host in ret["altnames"]:
+                for host in ret['altnames']:
                     certhosts.append(host.replace("dns:", ""))
 
-                ret["hosts"] = certhosts
+                ret['hosts'] = certhosts
 
                 self.debug(f"Checking for {fqdn} in certificate subject")
                 fqdn_tld = ".".join(fqdn.split(".")[1:]).lower()
@@ -1172,14 +1075,14 @@ class SpiderFoot:
                         found = True
 
                 if not found:
-                    ret["mismatch"] = True
+                    ret['mismatch'] = True
             except Exception as e:
                 self.error(f"Error processing certificate: {e}")
-                ret["certerror"] = True
+                ret['certerror'] = True
 
         return ret
 
-    def getSession(self) -> "requests.sessions.Session":
+    def getSession(self) -> 'requests.sessions.Session':
         """Return requests session object.
 
         Returns:
@@ -1188,8 +1091,8 @@ class SpiderFoot:
         session = requests.session()
         if self.socksProxy:
             session.proxies = {
-                "http": self.socksProxy,
-                "https": self.socksProxy,
+                'http': self.socksProxy,
+                'https': self.socksProxy,
             }
         return session
 
@@ -1205,10 +1108,10 @@ class SpiderFoot:
             str: Sanitized URL
         """
         pats = {
-            r"key=\S+": "key=XXX",
-            r"pass=\S+": "pass=XXX",
-            r"user=\S+": "user=XXX",
-            r"password=\S+": "password=XXX",
+            r'key=\S+': "key=XXX",
+            r'pass=\S+': "pass=XXX",
+            r'user=\S+': "user=XXX",
+            r'password=\S+': "password=XXX"
         }
 
         ret = url
@@ -1217,35 +1120,25 @@ class SpiderFoot:
 
         return ret
 
-    def isValidLocalOrLoopbackIp(ip):
-        """Check if an IP address is a valid local or loopback address.
+    def isValidLocalOrLoopbackIp(self, ip: str) -> bool:
+        """Check if the specified IPv4 or IPv6 address is a loopback or local network IP address (IPv4 RFC1918 / IPv6 RFC4192 ULA).
 
         Args:
-            ip (str): IP address
+            ip (str): IPv4 or IPv6 address
 
         Returns:
-            bool: IP address is a valid local or loopback address
+            bool: IP address is local or loopback
         """
-        try:
-            # Import inside the function to avoid import errors in tests
-            from netaddr import IPAddress
-            
-            if not isinstance(ip, IPAddress):
-                ip_obj = IPAddress(ip)
-            else:
-                ip_obj = ip
-                
-            # Add is_private method if it doesn't exist
-            if not hasattr(ip_obj, 'is_private'):
-                ip_obj.is_private = lambda: (
-                    ip_obj.is_private() if hasattr(ip_obj, '_is_private') else 
-                    (ip_obj in IPAddress("10.0.0.0/8") or 
-                    ip_obj in IPAddress("172.16.0.0/12") or 
-                    ip_obj in IPAddress("192.168.0.0/16"))
-                )
-            return ip_obj.is_private() or ip_obj.is_loopback()
-        except Exception:
+        if not self.validIP(ip) and not self.validIP6(ip):
             return False
+
+        if netaddr.IPAddress(ip).is_private():
+            return True
+
+        if netaddr.IPAddress(ip).is_loopback():
+            return True
+
+        return False
 
     def useProxyForUrl(self, url: str) -> bool:
         """Check if the configured proxy should be used to connect to a specified URL.
@@ -1261,15 +1154,15 @@ class SpiderFoot:
         """
         host = self.urlFQDN(url).lower()
 
-        if not self.opts["_socks1type"]:
+        if not self.opts['_socks1type']:
             return False
 
-        proxy_host = self.opts["_socks2addr"]
+        proxy_host = self.opts['_socks2addr']
 
         if not proxy_host:
             return False
 
-        proxy_port = self.opts["_socks3port"]
+        proxy_port = self.opts['_socks3port']
 
         if not proxy_port:
             return False
@@ -1287,23 +1180,13 @@ class SpiderFoot:
 
         # Never proxy local hostnames
         else:
-            neverProxyNames = ["local", "localhost"]
+            neverProxyNames = ['local', 'localhost']
             if host in neverProxyNames:
                 return False
 
             for s in neverProxyNames:
                 if host.endswith(s):
                     return False
-
-            # If it resolves to a private IP, assume no proxy
-            try:
-                if self.resolveHost(host):
-                    for ip in self.resolveHost(host):
-                        ipaddr = netaddr.IPNetwork(ip)
-                        if ipaddr.is_private() or ipaddr.is_loopback():
-                            return False
-            except BaseException:
-                pass
 
         return True
 
@@ -1319,7 +1202,7 @@ class SpiderFoot:
         disableContentEncoding: bool = False,
         sizeLimit: int = None,
         headOnly: bool = False,
-        verify: bool = True,
+        verify: bool = True
     ) -> dict:
         """Fetch a URL and return the HTTP response as a dictionary.
 
@@ -1343,11 +1226,11 @@ class SpiderFoot:
             return None
 
         result = {
-            "code": None,
-            "status": None,
-            "content": None,
-            "headers": None,
-            "realurl": url,
+            'code': None,
+            'status': None,
+            'content': None,
+            'headers': None,
+            'realurl': url
         }
 
         url = url.strip()
@@ -1358,7 +1241,7 @@ class SpiderFoot:
             self.debug(f"Could not parse URL: {url}")
             return None
 
-        if parsed_url.scheme != "http" and parsed_url.scheme != "https":
+        if parsed_url.scheme != 'http' and parsed_url.scheme != 'https':
             self.debug(f"Invalid URL scheme for URL: {url}")
             return None
 
@@ -1367,17 +1250,17 @@ class SpiderFoot:
         proxies = dict()
         if self.useProxyForUrl(url):
             proxies = {
-                "http": self.socksProxy,
-                "https": self.socksProxy,
+                'http': self.socksProxy,
+                'https': self.socksProxy,
             }
 
         header = dict()
         btime = time.time()
 
         if isinstance(useragent, list):
-            header["User-Agent"] = random.SystemRandom().choice(useragent)
+            header['User-Agent'] = random.SystemRandom().choice(useragent)
         else:
-            header["User-Agent"] = useragent
+            header['User-Agent'] = useragent
 
         # Add custom headers
         if isinstance(headers, dict):
@@ -1389,50 +1272,36 @@ class SpiderFoot:
         request_log.append(f"timeout={timeout}")
         request_log.append(f"cookies={cookies}")
 
-        # Initialize _socks1type if it doesn't exist
-        if "_socks1type" not in self.opts:
-            self.opts["_socks1type"] = ""
-            self.opts["_socks2addr"] = ""
-            self.opts["_socks3port"] = ""
-            self.opts["_socks4user"] = ""
-            self.opts["_socks5pwd"] = ""
-
         if sizeLimit or headOnly:
             if noLog:
-                self.debug(
-                    f"Fetching (HEAD): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                )
+                self.debug(f"Fetching (HEAD): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
             else:
-                self.info(
-                    f"Fetching (HEAD): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                )
+                self.info(f"Fetching (HEAD): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
 
             try:
                 hdr = self.getSession().head(
-                    url, headers=header, proxies=proxies, verify=verify, timeout=timeout
+                    url,
+                    headers=header,
+                    proxies=proxies,
+                    verify=verify,
+                    timeout=timeout
                 )
             except Exception as e:
                 if noLog:
-                    self.debug(
-                        f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}",
-                        exc_info=True,
-                    )
+                    self.debug(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}", exc_info=True)
                 else:
-                    self.error(
-                        f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}",
-                        exc_info=True,
-                    )
+                    self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {url}", exc_info=True)
 
                 return result
 
-            size = int(hdr.headers.get("content-length", 0))
-            newloc = hdr.headers.get("location", url).strip()
+            size = int(hdr.headers.get('content-length', 0))
+            newloc = hdr.headers.get('location', url).strip()
 
             # Relative re-direct
             if newloc.startswith("/") or newloc.startswith("../"):
                 newloc = SpiderFootHelpers.urlBaseUrl(url) + newloc
-            result["realurl"] = newloc
-            result["code"] = str(hdr.status_code)
+            result['realurl'] = newloc
+            result['code'] = str(hdr.status_code)
 
             if headOnly:
                 return result
@@ -1440,56 +1309,41 @@ class SpiderFoot:
             if size > sizeLimit:
                 return result
 
-            if result["realurl"] != url:
+            if result['realurl'] != url:
                 if noLog:
-                    self.debug(
-                        f"Fetching (HEAD): {self.removeUrlCreds(result['realurl'])} ({', '.join(request_log)})"
-                    )
+                    self.debug(f"Fetching (HEAD): {self.removeUrlCreds(result['realurl'])} ({', '.join(request_log)})")
                 else:
-                    self.info(
-                        f"Fetching (HEAD): {self.removeUrlCreds(result['realurl'])} ({', '.join(request_log)})"
-                    )
+                    self.info(f"Fetching (HEAD): {self.removeUrlCreds(result['realurl'])} ({', '.join(request_log)})")
 
                 try:
                     hdr = self.getSession().head(
-                        result["realurl"],
+                        result['realurl'],
                         headers=header,
                         proxies=proxies,
                         verify=verify,
-                        timeout=timeout,
+                        timeout=timeout
                     )
-                    size = int(hdr.headers.get("content-length", 0))
-                    result["realurl"] = hdr.headers.get(
-                        "location", result["realurl"])
-                    result["code"] = str(hdr.status_code)
+                    size = int(hdr.headers.get('content-length', 0))
+                    result['realurl'] = hdr.headers.get('location', result['realurl'])
+                    result['code'] = str(hdr.status_code)
 
                     if size > sizeLimit:
                         return result
 
                 except Exception as e:
                     if noLog:
-                        self.debug(
-                            f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}",
-                            exc_info=True,
-                        )
+                        self.debug(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}", exc_info=True)
                     else:
-                        self.error(
-                            f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}",
-                            exc_info=True,
-                        )
+                        self.error(f"Unexpected exception ({e}) occurred fetching (HEAD only) URL: {result['realurl']}", exc_info=True)
 
                     return result
 
         try:
             if postData:
                 if noLog:
-                    self.debug(
-                        f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                    )
+                    self.debug(f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 else:
-                    self.info(
-                        f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                    )
+                    self.info(f"Fetching (POST): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 res = self.getSession().post(
                     url,
                     data=postData,
@@ -1498,17 +1352,13 @@ class SpiderFoot:
                     allow_redirects=True,
                     cookies=cookies,
                     timeout=timeout,
-                    verify=verify,
+                    verify=verify
                 )
             else:
                 if noLog:
-                    self.debug(
-                        f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                    )
+                    self.debug(f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 else:
-                    self.info(
-                        f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})"
-                    )
+                    self.info(f"Fetching (GET): {self.removeUrlCreds(url)} ({', '.join(request_log)})")
                 res = self.getSession().get(
                     url,
                     headers=header,
@@ -1516,53 +1366,41 @@ class SpiderFoot:
                     allow_redirects=True,
                     cookies=cookies,
                     timeout=timeout,
-                    verify=verify,
+                    verify=verify
                 )
         except requests.exceptions.RequestException as e:
             self.error(f"Failed to connect to {url}: {e}")
             return result
         except Exception as e:
             if noLog:
-                self.debug(
-                    f"Unexpected exception ({e}) occurred fetching URL: {url}",
-                    exc_info=True,
-                )
+                self.debug(f"Unexpected exception ({e}) occurred fetching URL: {url}", exc_info=True)
             else:
-                self.error(
-                    f"Unexpected exception ({e}) occurred fetching URL: {url}",
-                    exc_info=True,
-                )
+                self.error(f"Unexpected exception ({e}) occurred fetching URL: {url}", exc_info=True)
 
             return result
 
         try:
-            result["headers"] = dict()
-            result["realurl"] = res.url
-            result["code"] = str(res.status_code)
+            result['headers'] = dict()
+            result['realurl'] = res.url
+            result['code'] = str(res.status_code)
 
             for header, value in res.headers.items():
-                result["headers"][str(header).lower()] = str(value)
+                result['headers'][str(header).lower()] = str(value)
 
             # Sometimes content exceeds the size limit after decompression
             if sizeLimit and len(res.content) > sizeLimit:
-                self.debug(
-                    f"Content exceeded size limit ({sizeLimit}), so returning no data just headers"
-                )
+                self.debug(f"Content exceeded size limit ({sizeLimit}), so returning no data just headers")
                 return result
 
-            refresh_header = result["headers"].get("refresh")
+            refresh_header = result['headers'].get('refresh')
             if refresh_header:
                 try:
                     newurl = refresh_header.split(";url=")[1]
                 except Exception as e:
-                    self.debug(
-                        f"Refresh header '{refresh_header}' found, but not parsable: {e}"
-                    )
+                    self.debug(f"Refresh header '{refresh_header}' found, but not parsable: {e}")
                     return result
 
-                self.debug(
-                    f"Refresh header '{refresh_header}' found, re-directing to {self.removeUrlCreds(newurl)}"
-                )
+                self.debug(f"Refresh header '{refresh_header}' found, re-directing to {self.removeUrlCreds(newurl)}")
 
                 return self.fetchUrl(
                     newurl,
@@ -1574,11 +1412,11 @@ class SpiderFoot:
                     postData,
                     disableContentEncoding,
                     sizeLimit,
-                    headOnly,
+                    headOnly
                 )
 
             if disableContentEncoding:
-                result["content"] = res.content
+                result['content'] = res.content
             else:
                 for encoding in ("utf-8", "ascii"):
                     try:
@@ -1591,18 +1429,13 @@ class SpiderFoot:
                     result["content"] = res.content
 
         except Exception as e:
-            self.error(
-                f"Unexpected exception ({e}) occurred parsing response for URL: {url}",
-                exc_info=True,
-            )
-            result["content"] = None
-            result["status"] = str(e)
+            self.error(f"Unexpected exception ({e}) occurred parsing response for URL: {url}", exc_info=True)
+            result['content'] = None
+            result['status'] = str(e)
 
         atime = time.time()
         t = str(atime - btime)
-        self.info(
-            f"Fetched {self.removeUrlCreds(url)} ({len(result['content'] or '')} bytes in {t}s)"
-        )
+        self.info(f"Fetched {self.removeUrlCreds(url)} ({len(result['content'] or '')} bytes in {t}s)")
         return result
 
     def checkDnsWildcard(self, target: str) -> bool:
@@ -1617,18 +1450,15 @@ class SpiderFoot:
         if not target:
             return False
 
-        randpool = "bcdfghjklmnpqrstvwxyz3456789"
-        randhost = "".join([random.SystemRandom().choice(randpool)
-                           for x in range(10)])
+        randpool = 'bcdfghjklmnpqrstvwxyz3456789'
+        randhost = ''.join([random.SystemRandom().choice(randpool) for x in range(10)])
 
         if not self.resolveHost(randhost + "." + target):
             return False
 
         return True
 
-    from typing import Tuple
-
-    def cveInfo(self, cveId: str, sources: str = "circl,nist") -> Tuple[str, str]:
+    def cveInfo(self, cveId: str, sources: str = "circl,nist") -> (str, str):
         """Look up a CVE ID for more information in the first available source.
 
         Args:
@@ -1662,48 +1492,36 @@ class SpiderFoot:
             if not jsondata:
                 # Fetch data from source
                 if source == "nist":
-                    ret = self.fetchUrl(
-                        f"https://services.nvd.nist.gov/rest/json/cve/1.0/{cveId}",
-                        timeout=5,
-                    )
+                    ret = self.fetchUrl(f"https://services.nvd.nist.gov/rest/json/cve/1.0/{cveId}", timeout=5)
                 if source == "circl":
-                    ret = self.fetchUrl(
-                        f"https://cve.circl.lu/api/cve/{cveId}", timeout=5
-                    )
+                    ret = self.fetchUrl(f"https://cve.circl.lu/api/cve/{cveId}", timeout=5)
 
                 if not ret:
                     continue
 
-                if not ret["content"]:
+                if not ret['content']:
                     continue
 
-                self.cachePut(f"{source}-{cveId}", ret["content"])
-                jsondata = ret["content"]
+                self.cachePut(f"{source}-{cveId}", ret['content'])
+                jsondata = ret['content']
 
             try:
                 data = json.loads(jsondata)
 
                 if source == "circl":
-                    score = data.get("cvss", "Unknown")
+                    score = data.get('cvss', 'Unknown')
                     rating = cveRating(score)
                     if rating:
                         eventType = f"VULNERABILITY_CVE_{rating}"
-                        return (
-                            eventType,
-                            f"{cveId}\n<SFURL>https://nvd.nist.gov/vuln/detail/{cveId}</SFURL>\n"
-                            f"Score: {score}\nDescription: {data.get('summary', 'Unknown')}",
-                        )
+                        return (eventType, f"{cveId}\n<SFURL>https://nvd.nist.gov/vuln/detail/{cveId}</SFURL>\n"
+                                f"Score: {score}\nDescription: {data.get('summary', 'Unknown')}")
 
                 if source == "nist":
                     try:
-                        if data["result"]["CVE_Items"][0]["impact"].get("baseMetricV3"):
-                            score = data["result"]["CVE_Items"][0]["impact"][
-                                "baseMetricV3"
-                            ]["cvssV3"]["baseScore"]
+                        if data['result']['CVE_Items'][0]['impact'].get('baseMetricV3'):
+                            score = data['result']['CVE_Items'][0]['impact']['baseMetricV3']['cvssV3']['baseScore']
                         else:
-                            score = data["result"]["CVE_Items"][0]["impact"][
-                                "baseMetricV2"
-                            ]["cvssV2"]["baseScore"]
+                            score = data['result']['CVE_Items'][0]['impact']['baseMetricV2']['cvssV2']['baseScore']
                         rating = cveRating(score)
                         if rating:
                             eventType = f"VULNERABILITY_CVE_{rating}"
@@ -1711,20 +1529,14 @@ class SpiderFoot:
                         score = "Unknown"
 
                     try:
-                        descr = data["result"]["CVE_Items"][0]["cve"]["description"][
-                            "description_data"
-                        ][0]["value"]
+                        descr = data['result']['CVE_Items'][0]['cve']['description']['description_data'][0]['value']
                     except Exception:
                         descr = "Unknown"
 
-                    return (
-                        eventType,
-                        f"{cveId}\n<SFURL>https://nvd.nist.gov/vuln/detail/{cveId}</SFURL>\n"
-                        f"Score: {score}\nDescription: {descr}",
-                    )
+                    return (eventType, f"{cveId}\n<SFURL>https://nvd.nist.gov/vuln/detail/{cveId}</SFURL>\n"
+                            f"Score: {score}\nDescription: {descr}")
             except Exception as e:
-                self.debug(
-                    f"Unable to parse CVE response from {source.upper()}: {e}")
+                self.debug(f"Unable to parse CVE response from {source.upper()}: {e}")
                 continue
 
         return (eventType, f"{cveId}\nScore: Unknown\nDescription: Unknown")
@@ -1756,47 +1568,41 @@ class SpiderFoot:
             opts = {}
 
         search_string = searchString.replace(" ", "%20")
-        params = urllib.parse.urlencode(
-            {
-                "cx": opts["cse_id"],
-                "key": opts["api_key"],
-            }
-        )
+        params = urllib.parse.urlencode({
+            "cx": opts["cse_id"],
+            "key": opts["api_key"],
+        })
 
         response = self.fetchUrl(
             f"https://www.googleapis.com/customsearch/v1?q={search_string}&{params}",
             timeout=opts["timeout"],
         )
 
-        if response["code"] != "200":
+        if response['code'] != '200':
             self.error("Failed to get a valid response from the Google API")
             return None
 
         try:
-            response_json = json.loads(response["content"])
+            response_json = json.loads(response['content'])
         except ValueError:
-            self.error(
-                "The key 'content' in the Google API response doesn't contain valid JSON."
-            )
+            self.error("The key 'content' in the Google API response doesn't contain valid JSON.")
             return None
 
         if "items" not in response_json:
             return None
 
         # We attempt to make the URL params look as authentically human as possible
-        params = urllib.parse.urlencode(
-            {
-                "ie": "utf-8",
-                "oe": "utf-8",
-                "aq": "t",
-                "rls": "org.mozilla:en-US:official",
-                "client": "firefox-a",
-            }
-        )
+        params = urllib.parse.urlencode({
+            "ie": "utf-8",
+            "oe": "utf-8",
+            "aq": "t",
+            "rls": "org.mozilla:en-US:official",
+            "client": "firefox-a",
+        })
 
         return {
-            "urls": [str(k["link"]) for k in response_json["items"]],
-            "webSearchUrl": f"https://www.google.com/search?q={search_string}&{params}",
+            "urls": [str(k['link']) for k in response_json['items']],
+            "webSearchUrl": f"https://www.google.com/search?q={search_string}&{params}"
         }
 
     def bingIterate(self, searchString: str, opts: dict = None) -> dict:
@@ -1827,12 +1633,10 @@ class SpiderFoot:
             opts = {}
 
         search_string = searchString.replace(" ", "%20")
-        params = urllib.parse.urlencode(
-            {
-                "responseFilter": "Webpages",
-                "count": opts["count"],
-            }
-        )
+        params = urllib.parse.urlencode({
+            "responseFilter": "Webpages",
+            "count": opts["count"],
+        })
 
         response = self.fetchUrl(
             f"https://api.cognitive.microsoft.com/bing/v7.0/search?q={search_string}&{params}",
@@ -1841,297 +1645,22 @@ class SpiderFoot:
             headers={"Ocp-Apim-Subscription-Key": opts["api_key"]},
         )
 
-        if response["code"] != "200":
+        if response['code'] != '200':
             self.error("Failed to get a valid response from the Bing API")
             return None
 
         try:
-            response_json = json.loads(response["content"])
+            response_json = json.loads(response['content'])
         except ValueError:
-            self.error(
-                "The key 'content' in the bing API response doesn't contain valid JSON."
-            )
+            self.error("The key 'content' in the bing API response doesn't contain valid JSON.")
             return None
 
-        if (
-            "webPages" in response_json and
-            "value" in response_json["webPages"] and
-            "webSearchUrl" in response_json["webPages"]
-        ):
+        if ("webPages" in response_json and "value" in response_json["webPages"] and "webSearchUrl" in response_json["webPages"]):
             return {
-                "urls": [
-                    result["url"] for result in response_json["webPages"]["value"]
-                ],
+                "urls": [result["url"] for result in response_json["webPages"]["value"]],
                 "webSearchUrl": response_json["webPages"]["webSearchUrl"],
             }
 
         return None
 
-
-class SpiderFootPlugin:
-    def __init__(self):
-        self.__name__ = "module_name_not_set!"
-        self.__sfdb__ = None
-        self.__scanId__ = None
-        self.__target__ = None
-        self._stopScanning = False
-        self.__scanStatus__ = None
-        self.errorState = False
-        self.lastEvent = None
-        self.__configurableOpts__ = dict()
-        self.__outputFilter__ = None
-        self._listener = list()
-        self._listenerModules = ["*"]
-        self.dbh = None
-        self.scanId = None
-        self.target = None
-
-    def clearListeners(self):
-        """Reset the listener list to an empty list."""
-        self._listener = list()
-        self._listenerModules = ["*"]
-
-    def registerListener(self, listener):
-        """Register a listener with this module."""
-        self._listener.append(listener)
-
-    def setDbh(self, dbh):
-        """Set the database handle."""
-        self.dbh = dbh
-
-    def setOutputFilter(self, filter):
-        """Set the output filter."""
-        self.__outputFilter__ = filter
-
-    def setScanId(self, scanId):
-        """Set the scan ID."""
-        self.scanId = scanId
-
-    def setTarget(self, target):
-        """Set the target for this scan."""
-        self.target = target
-
-    def notifyListeners(self, event):
-        """Call the handleEvent function on listeners listening for events."""
-        for listener in self._listener:
-            listener.handleEvent(event)
-        return event
-
-    def setup(self):
-        """Initialize any required resources."""
-        return True
-
-    @property
-    def log(self):
-        """Handle to the logger object for this module."""
-        return self._log
-
-    @log.setter
-    def log(self, value):
-        """Set the log property to allow tests to inject mock loggers."""
-        self._log = value
-
-
-class SpiderFootCorrelator:
-    """SpiderFoot correlator class."""
-
-    def __init__(self, ruleset, scanId, events, dbh=None):
-        """Initialize SpiderFootCorrelator object.
-
-        Args:
-            ruleset (dict): dict of correlation rules
-            scanId (str): scan ID
-            events (list): list of SpiderFootEvent events
-            dbh (SpiderFootDb): SpiderFootDb object
-        """
-        if not isinstance(ruleset, dict):
-            raise TypeError(f"ruleset is {type(ruleset)}; expected dict()")
-
-        if not ruleset:
-            raise ValueError("ruleset is empty")
-
-        if not isinstance(scanId, str):
-            raise TypeError(f"scanId is {type(scanId)}; expected str()")
-
-        if not scanId:
-            raise ValueError("scanId value is blank")
-
-        if not isinstance(events, list):
-            raise TypeError(f"events is {type(events)}; expected list()")
-
-        if not events:
-            raise ValueError("events list is empty")
-
-        self.ruleset = ruleset
-        self.scanId = scanId
-        self.events = events
-        self.dbh = dbh
-
-    def correlate(self):
-        """Run correlation rules on the events.
-
-        Returns:
-            list: list of correlation results
-        """
-        results = []
-        for rule in self.ruleset:
-            for event in self.events:
-                if rule.match(event):
-                    results.append(rule.apply(event))
-        return results
-
-
-class SpiderFootScanner:
-    """SpiderFoot scanner."""
-
-    # Constructor
-    def __init__(
-        self,
-        scanId,
-        scanName,
-        scanTarget,
-        targetType,
-        moduleList,
-        globalOpts,
-        start=True,
-    ):
-        """Initialize SpiderFoot scanner.
-
-        Args:
-            scanId (str): scan ID
-            scanName (str): scan name
-            scanTarget (str): scan target
-            targetType (str): scan target type
-            moduleList (list): list of modules to run
-            globalOpts (dict): scan options
-            start (bool): Whether to start the scan. If False, just initialize.
-
-        Returns:
-            None
-        """
-        if not isinstance(scanId, str):
-            raise TypeError("scanId is %s; expected str" % type(scanId))
-
-        if not scanId:
-            raise ValueError("scanId value is blank")
-
-        if not isinstance(scanName, str):
-            raise TypeError("scanName is %s; expected str" % type(scanName))
-
-        if not scanName:
-            raise ValueError("scanName value is blank")
-
-        if not isinstance(scanTarget, str):
-            raise TypeError("targetValue is %s; expected str" %
-                            type(scanTarget))
-
-        if not scanTarget:
-            raise ValueError("targetValue value is blank")
-
-        if not isinstance(targetType, str):
-            raise TypeError("targetType is %s; expected str" %
-                            type(targetType))
-
-        valid_types = [
-            "IP_ADDRESS",
-            "NETBLOCK_OWNER",
-            "INTERNET_NAME",
-            "DOMAIN_NAME",
-            "DOMAIN_NAME_PARENT",
-            "BGP_AS_OWNER",
-            "EMAIL_ADDRESS",
-            "HUMAN_NAME",
-            "URL",
-            "PHONE_NUMBER",
-        ]
-        if targetType not in valid_types:
-            raise ValueError(
-                f"targetType is {targetType}; expected one of: {', '.join(valid_types)}"
-            )
-
-        if not isinstance(moduleList, list):
-            raise TypeError("moduleList is %s; expected list" %
-                            type(moduleList))
-
-        if not moduleList:
-            raise ValueError("moduleList is empty")
-
-        if not isinstance(globalOpts, dict):
-            raise TypeError("globalOpts is %s; expected dict" %
-                            type(globalOpts))
-
-        if not globalOpts:
-            raise ValueError("globalOpts is empty")
-
-        # Set up the proxy if specified
-        if globalOpts.get("_socks1type"):
-            proxy_type = globalOpts.get("_socks1type")
-            valid_proxy_types = ["HTTP", "SOCKS4", "SOCKS5", "TOR"]
-
-            if proxy_type not in valid_proxy_types:
-                raise ValueError(
-                    f"Invalid proxy type: {proxy_type}. Expected one of: {', '.join(valid_proxy_types)}"
-                )
-
-            if not globalOpts.get("_socks1addr"):
-                raise ValueError(
-                    f"Proxy type {proxy_type} specified but no proxy host (_socks1addr) specified."
-                )
-
-            # If port is not specified, still set up the proxy with default port
-            # The actual proxy setup would be here in the real implementation
-
-        self._scanId = scanId
-        self._scanName = scanName
-        self._targetValue = scanTarget
-        self._targetType = targetType
-        self._moduleList = moduleList
-        self._globalOpts = globalOpts
-        self._status = "INITIALIZING"  # ensure status is a string
-
-        if start:
-            self._startScan()
-
-    def _startScan(self):
-        # Placeholder for the actual scan starting logic
-        # Check if we have valid modules to run
-        valid_modules = False
-
-        # For the test cases, we'll simulate no valid modules
-        if not valid_modules:
-            self._setStatus("FAILED")
-
-    def _setStatus(self, status):
-        """Set the scan status.
-
-        Args:
-            status (str): scan status
-
-        Returns:
-            None
-        """
-        if not isinstance(status, str):
-            raise TypeError(f"Status is {type(status)}; expected str")
-
-        if not status.strip():
-            raise ValueError("Status value is blank")
-
-        self._status = status
-
-    @property
-    def scanId(self):
-        """Return the scan ID as a string.
-
-        Returns:
-            str: scan ID
-        """
-        return str(self._scanId)
-
-    @property
-    def status(self):
-        """Return the scan status as a string.
-
-        Returns:
-            str: scan status
-        """
-        return str(self._status)
+# end of SpiderFoot class

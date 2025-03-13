@@ -43,9 +43,12 @@ from mako.template import Template
 from fastapi.responses import StreamingResponse, HTMLResponse
 
 # Import our new utilities
-from spiderfoot.fastapi_logger import setup_logging, get_logger
-from spiderfoot.fastapi_error_handlers import setup_error_handlers
-from spiderfoot.fastapi_utils import setup_cors, APIKeyAuth, generate_api_key
+from spiderfoot.fastapi.utils.logging import setup_logging, get_logger
+from spiderfoot.fastapi.utils.errors import setup_error_handlers
+from spiderfoot.fastapi.utils import setup_cors, APIKeyAuth, generate_api_key
+
+# Add the missing import for APIKeyHeader
+from fastapi.security import APIKeyHeader
 
 mp.set_start_method("spawn", force=True)
 

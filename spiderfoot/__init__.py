@@ -105,23 +105,17 @@ def get_misp_integration(dbh):
 
 
 class SpiderFootStaticJS:
-    """
-    SpiderFoot static JavaScript class to handle JS dependencies
-    """
+    """SpiderFoot static JavaScript class to handle JS dependencies."""
 
     def __init__(self):
         self.js_resources = {}
 
     def add_resource(self, name, content):
-        """
-        Add a JavaScript resource
-        """
+        """Add a JavaScript resource."""
         self.js_resources[name] = content
 
     def get_resource(self, name):
-        """
-        Get a JavaScript resource by name
-        """
+        """Get a JavaScript resource by name."""
         if name in self.js_resources:
             return self.js_resources[name]
         return None

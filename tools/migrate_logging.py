@@ -19,8 +19,7 @@ import argparse
 
 
 def update_module_file(filepath, dry_run=False, verbose=False):
-    """
-    Update a single module file to use the new logging system
+    """Update a single module file to use the new logging system.
 
     Args:
         filepath (str): Path to the module file

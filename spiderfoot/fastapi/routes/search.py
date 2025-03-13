@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Search Routes
+"""SpiderFoot FastAPI Search Routes.
 
 This module defines routes for search functionality.
 """
@@ -21,12 +20,12 @@ async def search(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Search for data across scans.
-    
+
     Args:
         id: Filter by scan ID
         eventType: Filter by event type
         value: Filter by value
-    
+
     Returns:
         List of search results
     """
@@ -44,10 +43,10 @@ async def get_scan_history(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Get historical data for a scan.
-    
+
     Args:
         id: Scan ID
-    
+
     Returns:
         List of historical data points
     """

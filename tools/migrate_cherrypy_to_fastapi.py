@@ -9,8 +9,7 @@
 # Created:      01/03/2025
 # License:      MIT
 # -----------------------------------------------------------------
-"""
-Migration tool to help users migrate from CherryPy to FastAPI
+"""Migration tool to help users migrate from CherryPy to FastAPI.
 
 This script facilitates migrating custom SpiderFoot implementations from
 the legacy CherryPy web interface to the new FastAPI implementation.
@@ -27,10 +26,10 @@ from datetime import datetime
 
 def backup_file(filepath: str) -> str:
     """Create a backup of a file.
-    
+
     Args:
         filepath: Path to file
-        
+
     Returns:
         Path to backup file
     """
@@ -43,10 +42,10 @@ def backup_file(filepath: str) -> str:
 
 def check_for_cherrypy_imports(filepath: str) -> bool:
     """Check if file imports CherryPy.
-    
+
     Args:
         filepath: Path to file
-        
+
     Returns:
         True if file imports CherryPy
     """
@@ -57,10 +56,10 @@ def check_for_cherrypy_imports(filepath: str) -> bool:
 
 def check_for_sfwebui_imports(filepath: str) -> bool:
     """Check if file imports SpiderFootWebUi.
-    
+
     Args:
         filepath: Path to file
-        
+
     Returns:
         True if file imports SpiderFootWebUi
     """
@@ -71,10 +70,10 @@ def check_for_sfwebui_imports(filepath: str) -> bool:
 
 def replace_cherrypy_imports(filepath: str) -> bool:
     """Replace CherryPy imports with FastAPI imports.
-    
+
     Args:
         filepath: Path to file
-        
+
     Returns:
         True if changes were made
     """
@@ -119,10 +118,10 @@ def replace_cherrypy_imports(filepath: str) -> bool:
 
 def update_startup_script(filepath: str) -> bool:
     """Update startup script to use FastAPI.
-    
+
     Args:
         filepath: Path to file
-        
+
     Returns:
         True if changes were made
     """
@@ -184,10 +183,10 @@ def update_startup_script(filepath: str) -> bool:
 
 def scan_directory(directory: str) -> list:
     """Scan directory for Python files.
-    
+
     Args:
         directory: Directory to scan
-        
+
     Returns:
         List of Python files
     """

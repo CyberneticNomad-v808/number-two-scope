@@ -25,7 +25,7 @@ from spiderfoot.logconfig import get_module_logger
 
 
 class SpiderFootDb:
-    """SpiderFoot database
+    """SpiderFoot database.
 
     Attributes:
         conn: Database connection
@@ -564,7 +564,7 @@ class SpiderFootDb:
     ]
 
     def __init__(self, opts: Dict[str, Any], init: bool = False) -> None:
-        """Initialize SpiderFoot database
+        """Initialize SpiderFoot database.
 
         Args:
             opts (dict): database connection options
@@ -1001,7 +1001,8 @@ class SpiderFootDb:
         ended: str = None,
         status: str = None,
     ) -> None:
-        """Update the start time, end time or status (or all 3) of a scan instance.
+        """Update the start time, end time or status (or all 3) of a scan
+        instance.
 
         Args:
             instanceId (str): scan instance ID
@@ -1048,7 +1049,8 @@ class SpiderFootDb:
                 ) from None
 
     def scanInstanceGet(self, instanceId: str) -> list:
-        """Return info about a scan instance (name, target, created, started, ended, status)
+        """Return info about a scan instance (name, target, created, started,
+        ended, status)
 
         Args:
             instanceId (str): scan instance ID
@@ -1081,7 +1083,8 @@ class SpiderFootDb:
                 ) from e
 
     def scanResultSummary(self, instanceId: str, by: str = "type") -> list:
-        """Obtain a summary of the results, filtered by event type, module or entity.
+        """Obtain a summary of the results, filtered by event type, module or
+        entity.
 
         Args:
             instanceId (str): scan instance ID
@@ -1139,7 +1142,7 @@ class SpiderFootDb:
                 ) from e
 
     def scanCorrelationSummary(self, instanceId: str, by: str = "rule") -> list:
-        """Obtain a summary of the correlations, filtered by rule or risk
+        """Obtain a summary of the correlations, filtered by rule or risk.
 
         Args:
             instanceId (str): scan instance ID
@@ -1188,7 +1191,7 @@ class SpiderFootDb:
                 ) from e
 
     def scanCorrelationList(self, instanceId: str) -> list:
-        """Obtain a list of the correlations from a scan
+        """Obtain a list of the correlations from a scan.
 
         Args:
             instanceId (str): scan instance ID
@@ -1615,7 +1618,7 @@ class SpiderFootDb:
         return True
 
     def configGet(self) -> dict:
-        """Retreive the config from the database
+        """Retreive the config from the database.
 
         Returns:
             dict: config
@@ -2080,7 +2083,8 @@ class SpiderFootDb:
                 ) from e
 
     def scanElementSourcesAll(self, instanceId: str, childData: list) -> list:
-        """Get the full set of upstream IDs which are parents to the supplied set of IDs.
+        """Get the full set of upstream IDs which are parents to the supplied
+        set of IDs.
 
         Args:
             instanceId (str): scan instance ID
@@ -2152,7 +2156,8 @@ class SpiderFootDb:
         return [datamap, pc]
 
     def scanElementChildrenAll(self, instanceId: str, parentIds: list) -> list:
-        """Get the full set of downstream IDs which are children of the supplied set of IDs.
+        """Get the full set of downstream IDs which are children of the
+        supplied set of IDs.
 
         Args:
             instanceId (str): scan instance ID
@@ -2451,11 +2456,11 @@ class SpiderFootDb:
     
     def storeObject(self, mispObject, linkEvents: bool = True) -> bool:
         """Store a MISP object in the database.
-        
+
         Args:
             mispObject: MISP object to store
             linkEvents: Whether to link the object to existing events
-            
+
         Returns:
             bool: Success
         """

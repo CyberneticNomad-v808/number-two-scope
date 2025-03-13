@@ -134,7 +134,7 @@ class sfp_multiproxy(SpiderFootPlugin):
         return self.parseProxyList(res["content"])
 
     def parseProxyList(self, proxy_list):
-        """Parse plaintext open proxy list
+        """Parse plaintext open proxy list.
 
         Args:
             proxy_list (str): plaintext open proxy list from multiproxy.org

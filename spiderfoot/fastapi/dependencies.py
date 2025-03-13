@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Dependencies
+"""SpiderFoot FastAPI Dependencies.
 
-This module provides dependency functions for FastAPI dependency injection.
+This module provides dependency functions for FastAPI dependency
+injection.
 """
 
 from typing import Dict, Any, Optional
@@ -18,11 +18,11 @@ _api_key_auth: Optional[APIKeyAuth] = None
 
 def initialize_sf_api(web_config: Dict[str, Any], config: Dict[str, Any]) -> SpiderFootAPI:
     """Initialize the global SpiderFootAPI instance.
-    
+
     Args:
         web_config: Web interface configuration
         config: SpiderFoot configuration
-    
+
     Returns:
         SpiderFootAPI: The initialized SpiderFootAPI instance
     """
@@ -33,11 +33,11 @@ def initialize_sf_api(web_config: Dict[str, Any], config: Dict[str, Any]) -> Spi
 
 def initialize_api_key_auth(api_key_name: str = "X-API-Key", api_key: Optional[str] = None) -> APIKeyAuth:
     """Initialize the global API key authentication handler.
-    
+
     Args:
         api_key_name: Name of the API key header
         api_key: The API key to use for authentication
-    
+
     Returns:
         APIKeyAuth: The initialized API key auth handler
     """
@@ -48,10 +48,10 @@ def initialize_api_key_auth(api_key_name: str = "X-API-Key", api_key: Optional[s
 
 def get_sf_api() -> SpiderFootAPI:
     """Get the SpiderFootAPI instance.
-    
+
     Returns:
         SpiderFootAPI: The global SpiderFootAPI instance
-    
+
     Raises:
         HTTPException: If the API instance is not initialized
     """
@@ -66,13 +66,13 @@ def get_sf_api() -> SpiderFootAPI:
 
 def get_api_auth(api_key: str = Security(APIKeyHeader(name="X-API-Key"))) -> bool:
     """Verify API key authentication.
-    
+
     Args:
         api_key: API key from header
-    
+
     Returns:
         bool: True if authentication successful
-    
+
     Raises:
         HTTPException: If the API key is invalid
     """

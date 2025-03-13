@@ -1,8 +1,8 @@
-"""
-SpiderFoot event module.
+"""SpiderFoot event module.
 
-This module defines the SpiderFootEvent class used throughout the application
-to represent different types of data discovered during a scan.
+This module defines the SpiderFootEvent class used throughout the
+application to represent different types of data discovered during a
+scan.
 """
 
 import hashlib
@@ -13,7 +13,8 @@ from spiderfoot.logconfig import get_module_logger
 
 
 class SpiderFootEvent:
-    """SpiderFootEvent object representing events of data found for a scan target.
+    """SpiderFootEvent object representing events of data found for a scan
+    target.
 
     Attributes:
         eventType (str): Event type, e.g. URL_FORM, DOMAIN_NAME, etc.

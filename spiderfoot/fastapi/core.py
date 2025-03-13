@@ -1,8 +1,8 @@
-"""
-SpiderFoot FastAPI Core
+"""SpiderFoot FastAPI Core.
 
-This module provides the core API functionality for the SpiderFoot FastAPI implementation.
-It contains the SpiderFootAPI class which encapsulates all API operations.
+This module provides the core API functionality for the SpiderFoot
+FastAPI implementation. It contains the SpiderFootAPI class which
+encapsulates all API operations.
 """
 
 import csv
@@ -79,7 +79,7 @@ class SpiderFootAPI:
 
     def _init_config(self, config: Dict[str, Any]) -> None:
         """Initialize configuration.
-        
+
         Args:
             config: SpiderFoot configuration
         """
@@ -90,7 +90,7 @@ class SpiderFootAPI:
     
     def _init_logging(self, loggingQueue: Optional["mp.Queue"] = None) -> None:
         """Initialize logging.
-        
+
         Args:
             loggingQueue: Optional logging queue for multiprocessing
         """

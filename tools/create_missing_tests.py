@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""
-Script to create test modules for SpiderFoot modules that don't have test classes yet.
-This will scan the modules directory, identify modules without test files,
-and generate appropriate test files using our wrapper pattern.
+"""Script to create test modules for SpiderFoot modules that don't have test
+classes yet.
+
+This will scan the modules directory, identify modules without test
+files, and generate appropriate test files using our wrapper pattern.
 """
 
 import os
@@ -133,7 +134,8 @@ def clean_module_name(name):
 
 
 def format_python_dict(python_dict, indent=12):
-    """Format a Python dictionary for insertion into code with proper indentation."""
+    """Format a Python dictionary for insertion into code with proper
+    indentation."""
     if not python_dict:
         return ""
 

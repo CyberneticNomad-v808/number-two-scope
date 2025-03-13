@@ -16,10 +16,11 @@ from spiderfoot import SpiderFootEvent, SpiderFootPlugin
 
 
 class sfp_netlas(SpiderFootPlugin):
-    """
-    SpiderFoot plug-in for searching Netlas API for domain, IP address, and other information.
+    """SpiderFoot plug-in for searching Netlas API for domain, IP address, and
+    other information.
 
-    This class is responsible for querying Netlas API to retrieve information about domains, IP addresses, and other related data.
+    This class is responsible for querying Netlas API to retrieve
+    information about domains, IP addresses, and other related data.
     """
 
     meta = {
@@ -60,8 +61,7 @@ class sfp_netlas(SpiderFootPlugin):
     errorState = False
 
     def setup(self, sfc, userOpts=dict()):
-        """
-        Set up the module with user options.
+        """Set up the module with user options.
 
         Args:
             sfc: SpiderFoot instance
@@ -75,8 +75,7 @@ class sfp_netlas(SpiderFootPlugin):
             self.opts[opt] = userOpts[opt]
 
     def watchedEvents(self):
-        """
-        Define the events this module is interested in for input.
+        """Define the events this module is interested in for input.
 
         Returns:
             list: List of event types
@@ -84,8 +83,7 @@ class sfp_netlas(SpiderFootPlugin):
         return ["DOMAIN_NAME", "IP_ADDRESS", "IPV6_ADDRESS"]
 
     def producedEvents(self):
-        """
-        Define the events this module produces.
+        """Define the events this module produces.
 
         Returns:
             list: List of event types
@@ -93,8 +91,7 @@ class sfp_netlas(SpiderFootPlugin):
         return ["RAW_RIR_DATA", "GEOINFO", "PHYSICAL_COORDINATES", "PROVIDER_TELCO"]
 
     def queryNetlas(self, qry, qryType):
-        """
-        Query Netlas API for information.
+        """Query Netlas API for information.
 
         Args:
             qry (str): Query string
@@ -131,8 +128,7 @@ class sfp_netlas(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def parseApiResponse(self, res: dict):
-        """
-        Parse the API response from Netlas.
+        """Parse the API response from Netlas.
 
         Args:
             res (dict): API response
@@ -182,8 +178,7 @@ class sfp_netlas(SpiderFootPlugin):
         return None
 
     def handleEvent(self, event):
-        """
-        Handle events sent to this module.
+        """Handle events sent to this module.
 
         Args:
             event: SpiderFoot event

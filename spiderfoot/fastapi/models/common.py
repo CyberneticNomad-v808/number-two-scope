@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Common Models
+"""SpiderFoot FastAPI Common Models.
 
 This module defines common Pydantic models used across the API.
 """

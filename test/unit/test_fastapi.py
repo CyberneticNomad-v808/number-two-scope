@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Unit Tests
+"""SpiderFoot FastAPI Unit Tests.
 
-This module contains unit tests for the SpiderFoot FastAPI implementation.
+This module contains unit tests for the SpiderFoot FastAPI
+implementation.
 """
 
 import unittest

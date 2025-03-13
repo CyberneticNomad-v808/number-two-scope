@@ -3,8 +3,8 @@ from unittest.mock import patch, MagicMock
 
 
 class SpiderFootModuleTestCase(unittest.TestCase):
-    """
-    Base class for SpiderFoot module test cases.
+    """Base class for SpiderFoot module test cases.
+
     Handles common test setup and provides default options.
     """
 
@@ -114,8 +114,9 @@ class SpiderFootModuleTestCase(unittest.TestCase):
         target_value="example.com",
         target_type="INTERNET_NAME",
     ):
-        """
-        Helper method to execute a standard test for a module with the given event.
+        """Helper method to execute a standard test for a module with the given
+        event.
+
         Returns the module instance and event after handling.
         """
         from sflib import SpiderFoot
@@ -143,9 +144,10 @@ class SpiderFootModuleTestCase(unittest.TestCase):
         return module
 
     def capture_module_events(self, module):
-        """
-        Override a module's notifyListeners method to capture events.
-        Returns a list to store events and the new notifyListeners function.
+        """Override a module's notifyListeners method to capture events.
+
+        Returns a list to store events and the new notifyListeners
+        function.
         """
         events = []
 
@@ -165,8 +167,9 @@ class SpiderFootModuleTestCase(unittest.TestCase):
     def assert_module_produces_events_from(
         self, module_class, event_data, expected_types
     ):
-        """
-        Assert that a module produces events of the expected types when given an event.
+        """Assert that a module produces events of the expected types when
+        given an event.
+
         Returns the generated events for further inspection.
         """
         module, sf = self.setup_module(module_class)
@@ -201,7 +204,8 @@ class SpiderFootModuleTestCase(unittest.TestCase):
         return events
 
     def setup_module_with_mocks(self, module_class):
-        """Set up a module for testing with default options and mocked logging."""
+        """Set up a module for testing with default options and mocked
+        logging."""
         from sflib import SpiderFoot
 
         sf = SpiderFoot(self.default_options)
@@ -252,9 +256,10 @@ class SpiderFootModuleTestCase(unittest.TestCase):
             return module, sf
 
     def setup_test_module(self, module_class):
-        """
-        Set up a module for testing with patched logging.
-        This should be the preferred way to create module instances in tests.
+        """Set up a module for testing with patched logging.
+
+        This should be the preferred way to create module instances in
+        tests.
         """
         from sflib import SpiderFoot
 
@@ -266,8 +271,8 @@ class SpiderFootModuleTestCase(unittest.TestCase):
             return module, sf
 
     def create_test_module_subclass(self, module_class, init_attributes=None):
-        """
-        Dynamically create a subclass of the module to test that skips problematic initialization.
+        """Dynamically create a subclass of the module to test that skips
+        problematic initialization.
 
         Args:
             module_class: The SpiderFoot module class to subclass
@@ -323,8 +328,8 @@ class SpiderFootModuleTestCase(unittest.TestCase):
     def create_module_wrapper(
         self, module_class, name_prefix="Sfp", module_attributes=None
     ):
-        """
-        Create a test-friendly wrapper of a module class that avoids initialization problems.
+        """Create a test-friendly wrapper of a module class that avoids
+        initialization problems.
 
         Args:
             module_class: The SpiderFoot module class to wrap

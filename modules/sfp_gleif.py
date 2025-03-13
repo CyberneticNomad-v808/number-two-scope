@@ -58,7 +58,7 @@ class sfp_gleif(SpiderFootPlugin):
         return ["COMPANY_NAME", "LEI", "PHYSICAL_ADDRESS", "RAW_RIR_DATA"]
 
     def searchLegalName(self, qry):
-        """Fuzzy search for legal entity by name
+        """Fuzzy search for legal entity by name.
 
         Args:
             qry (str): legal entity name
@@ -102,7 +102,7 @@ class sfp_gleif(SpiderFootPlugin):
         return data
 
     def searchAutocompletions(self, qry):
-        """Search for legal entity name autocompletions
+        """Search for legal entity name autocompletions.
 
         Args:
             qry (str): legal entity name

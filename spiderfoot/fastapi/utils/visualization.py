@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Visualization Utilities
+"""SpiderFoot FastAPI Visualization Utilities.
 
-This module provides utilities for data visualization in the SpiderFoot API.
+This module provides utilities for data visualization in the SpiderFoot
+API.
 """
 
 from typing import List, Dict, Any, Optional
@@ -17,7 +17,7 @@ class VisualizationHelper:
     
     def __init__(self, config: Dict[str, Any]):
         """Initialize visualization helper.
-        
+
         Args:
             config: SpiderFoot configuration
         """
@@ -30,11 +30,11 @@ class VisualizationHelper:
         as_gexf: bool = False
     ) -> Optional[Any]:
         """Get visualization data for a scan.
-        
+
         Args:
             scan_id: Scan ID
             as_gexf: Whether to return data in GEXF format
-            
+
         Returns:
             Visualization data in JSON or GEXF format
         """
@@ -64,11 +64,11 @@ class VisualizationHelper:
         as_gexf: bool = False
     ) -> Optional[Any]:
         """Get visualization data for multiple scans.
-        
+
         Args:
             scan_ids: List of scan IDs
             as_gexf: Whether to return data in GEXF format
-            
+
         Returns:
             Visualization data in JSON or GEXF format
         """

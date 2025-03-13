@@ -91,11 +91,10 @@ EmptyTree = typing.Dict[None, object]
 
 
 class SpiderFootHelpers:
-    """
-    SpiderFoot helpers class.
-    
-    This class should contain your helper methods that were
-    originally in the main module.
+    """SpiderFoot helpers class.
+
+    This class should contain your helper methods that were originally
+    in the main module.
     """
     # Copy the implementation of SpiderFootHelpers from the original location
     pass

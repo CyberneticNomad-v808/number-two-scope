@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Testing Utilities
+"""SpiderFoot FastAPI Testing Utilities.
 
-This module provides utilities for testing the SpiderFoot FastAPI implementation.
+This module provides utilities for testing the SpiderFoot FastAPI
+implementation.
 """
 
 import json
@@ -22,12 +22,12 @@ def create_test_client(
     mock_db: bool = True
 ) -> TestClient:
     """Create a FastAPI TestClient for testing.
-    
+
     Args:
         config: SpiderFoot configuration
         web_config: Web interface configuration
         mock_db: Whether to mock the database
-        
+
     Returns:
         Test client for making requests
     """
@@ -61,10 +61,10 @@ def create_test_client(
 
 def create_temp_config_file(config: Dict[str, Any]) -> str:
     """Create a temporary configuration file.
-    
+
     Args:
         config: Configuration dictionary
-        
+
     Returns:
         Path to temporary configuration file
     """
@@ -91,7 +91,7 @@ def mock_scan_result(
     event_count: int = 10
 ) -> List[Any]:
     """Create a mock scan result.
-    
+
     Args:
         scan_id: Scan ID
         scan_name: Scan name
@@ -101,7 +101,7 @@ def mock_scan_result(
         ended: End timestamp
         created: Creation timestamp
         event_count: Number of events
-        
+
     Returns:
         Mock scan result
     """
@@ -119,11 +119,11 @@ def mock_scan_result(
 
 def mock_scan_history(scan_id: str, points: int = 10) -> List[List[int]]:
     """Create mock scan history data.
-    
+
     Args:
         scan_id: Scan ID
         points: Number of data points
-        
+
     Returns:
         Mock scan history data
     """
@@ -144,12 +144,12 @@ def mock_api_response(
     start_time: int = 1625000000
 ) -> List[List[Any]]:
     """Create a mock API response with event data.
-    
+
     Args:
         scan_id: Scan ID
         event_count: Number of events
         start_time: Start timestamp
-        
+
     Returns:
         Mock API response data
     """

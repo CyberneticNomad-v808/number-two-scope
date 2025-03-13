@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Example script demonstrating how to export SpiderFoot scan results to MISP format
-"""
+"""Example script demonstrating how to export SpiderFoot scan results to MISP
+format."""
 
 import sys
 import json

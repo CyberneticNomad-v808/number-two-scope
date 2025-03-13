@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Helper Utilities
+"""SpiderFoot FastAPI Helper Utilities.
 
-This module provides general helper functions for the SpiderFoot FastAPI implementation.
+This module provides general helper functions for the SpiderFoot FastAPI
+implementation.
 """
 
 import os
@@ -13,7 +13,7 @@ from datetime import datetime
 
 def generate_unique_id() -> str:
     """Generate a unique ID.
-    
+
     Returns:
         Unique ID string
     """
@@ -21,10 +21,10 @@ def generate_unique_id() -> str:
 
 def format_timestamp(timestamp: Union[int, float]) -> str:
     """Format a Unix timestamp to a human-readable string.
-    
+
     Args:
         timestamp: Unix timestamp
-        
+
     Returns:
         Formatted timestamp string
     """
@@ -36,10 +36,10 @@ def format_timestamp(timestamp: Union[int, float]) -> str:
 
 def sanitize_input(input_str: str) -> str:
     """Sanitize user input to prevent XSS and injection attacks.
-    
+
     Args:
         input_str: User input string
-        
+
     Returns:
         Sanitized string
     """
@@ -53,10 +53,10 @@ def sanitize_input(input_str: str) -> str:
 
 def parse_comma_separated_list(input_str: str) -> List[str]:
     """Parse a comma-separated string into a list.
-    
+
     Args:
         input_str: Comma-separated string
-        
+
     Returns:
         List of strings
     """
@@ -67,10 +67,10 @@ def parse_comma_separated_list(input_str: str) -> List[str]:
 
 def is_valid_target(target: str) -> bool:
     """Check if a target is valid.
-    
+
     Args:
         target: Target string
-        
+
     Returns:
         True if target is valid
     """
@@ -94,12 +94,12 @@ def build_pagination_links(
     base_url: str
 ) -> Dict[str, Optional[str]]:
     """Build pagination links.
-    
+
     Args:
         current_page: Current page number
         total_pages: Total number of pages
         base_url: Base URL for pagination links
-        
+
     Returns:
         Dictionary of pagination links
     """
@@ -117,11 +117,11 @@ def calculate_scan_duration(
     end_time: Optional[Union[int, float]] = None
 ) -> str:
     """Calculate scan duration.
-    
+
     Args:
         start_time: Scan start timestamp
         end_time: Scan end timestamp (or None if still running)
-        
+
     Returns:
         Formatted duration string
     """
@@ -147,10 +147,10 @@ def calculate_scan_duration(
 
 def get_file_extension(filename: str) -> str:
     """Get file extension from filename.
-    
+
     Args:
         filename: Filename
-        
+
     Returns:
         File extension without dot
     """

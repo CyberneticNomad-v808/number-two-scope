@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Scan Models
+"""SpiderFoot FastAPI Scan Models.
 
 This module defines Pydantic models for scan-related operations.
 """

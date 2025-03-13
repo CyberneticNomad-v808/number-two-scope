@@ -1,5 +1,4 @@
-"""
-MISP object templates for SpiderFoot.
+"""MISP object templates for SpiderFoot.
 
 These templates help convert SpiderFoot data to structured MISP objects.
 """
@@ -153,10 +152,10 @@ MISP_OBJECT_TEMPLATES = {
 
 def get_template(object_type: str) -> Dict[str, Any]:
     """Get a MISP object template by type.
-    
+
     Args:
         object_type: Type of object template to retrieve
-        
+
     Returns:
         Dict: Template dictionary or empty dict if not found
     """
@@ -165,11 +164,11 @@ def get_template(object_type: str) -> Dict[str, Any]:
 
 def create_object_from_template(object_type: str, values: Dict[str, Any]) -> Dict[str, Any]:
     """Create a MISP object from a template.
-    
+
     Args:
         object_type: Type of object to create
         values: Dictionary of values to fill in the template
-        
+
     Returns:
         Dict: Filled template or empty dict if template not found
     """
@@ -208,11 +207,11 @@ def create_object_from_template(object_type: str, values: Dict[str, Any]) -> Dic
 
 def map_sf_event_to_misp_object(sf_event_type: str, sf_event_data: str) -> Dict[str, Any]:
     """Map SpiderFoot event to appropriate MISP object type.
-    
+
     Args:
         sf_event_type: SpiderFoot event type
         sf_event_data: SpiderFoot event data
-        
+
     Returns:
         Dict: Mapping information or empty dict if no mapping exists
     """

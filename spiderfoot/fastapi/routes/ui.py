@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI UI Routes
+"""SpiderFoot FastAPI UI Routes.
 
 This module defines routes for the HTML user interface.
 """

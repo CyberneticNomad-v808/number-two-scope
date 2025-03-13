@@ -32,10 +32,11 @@ from spiderfoot.logconfig import (
 
 
 class SafeQueueListener(QueueListener):
-    """Thread-safe implementation of QueueListener for handling logs from multiple threads.
+    """Thread-safe implementation of QueueListener for handling logs from
+    multiple threads.
 
-    This class extends QueueListener to provide thread-safety when processing
-    log records from multiple threads through a queue.
+    This class extends QueueListener to provide thread-safety when
+    processing log records from multiple threads through a queue.
     """
 
     def dequeue(self, block):
@@ -77,8 +78,8 @@ class SafeQueueListener(QueueListener):
 class SpiderFootSqliteLogHandler(logging.Handler):
     """Handler for logging to SQLite database.
 
-    This ensures all SQLite logging is done from a single
-    process and a single database handle to avoid concurrency issues.
+    This ensures all SQLite logging is done from a single process and a
+    single database handle to avoid concurrency issues.
     """
 
     def __init__(self, opts: dict) -> None:
@@ -135,10 +136,10 @@ class SpiderFootSqliteLogHandler(logging.Handler):
 
 
 class SpiderFootLogger:
-    """SpiderFoot logger class"""
+    """SpiderFoot logger class."""
 
     def __init__(self, logname, refresh_rate=1):
-        """Initialize SpiderFoot logger
+        """Initialize SpiderFoot logger.
 
         Args:
             logname (str): name of the log
@@ -157,7 +158,7 @@ class SpiderFootLogger:
         self._logger = value
 
     def debug(self, message):
-        """Log debug message
+        """Log debug message.
 
         Args:
             message (str): message to log
@@ -165,7 +166,7 @@ class SpiderFootLogger:
         self._logger.debug(message)
 
     def info(self, message):
-        """Log info message
+        """Log info message.
 
         Args:
             message (str): message to log
@@ -173,7 +174,7 @@ class SpiderFootLogger:
         self._logger.info(message)
 
     def warning(self, message):
-        """Log warning message
+        """Log warning message.
 
         Args:
             message (str): message to log
@@ -181,7 +182,7 @@ class SpiderFootLogger:
         self._logger.warning(message)
 
     def error(self, message):
-        """Log error message
+        """Log error message.
 
         Args:
             message (str): message to log
@@ -189,7 +190,7 @@ class SpiderFootLogger:
         self._logger.error(message)
 
     def critical(self, message):
-        """Log critical message
+        """Log critical message.
 
         Args:
             message (str): message to log

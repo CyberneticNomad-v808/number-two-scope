@@ -1,8 +1,7 @@
-"""
-SpiderFoot HTTP request handler module.
+"""SpiderFoot HTTP request handler module.
 
-This module provides a unified interface for making HTTP requests
-with consistent error handling, logging, and proxy support.
+This module provides a unified interface for making HTTP requests with
+consistent error handling, logging, and proxy support.
 """
 
 import json

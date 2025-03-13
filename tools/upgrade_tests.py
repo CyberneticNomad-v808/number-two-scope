@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Script to upgrade all SpiderFoot module tests.
+"""Script to upgrade all SpiderFoot module tests.
+
 This will:
 1. Create test files for modules without tests
 2. Update existing test files to use the wrapper pattern

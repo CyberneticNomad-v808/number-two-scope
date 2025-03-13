@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Database Utilities
+"""SpiderFoot FastAPI Database Utilities.
 
 This module provides utilities for working with the SpiderFoot database.
 It abstracts common database operations used across the API.
@@ -21,7 +20,7 @@ class DatabaseHelper:
     
     def __init__(self, config: Dict[str, Any]):
         """Initialize database helper.
-        
+
         Args:
             config: SpiderFoot configuration
         """
@@ -30,7 +29,7 @@ class DatabaseHelper:
     
     def get_scan_list(self) -> List[Dict[str, Any]]:
         """Get list of all scans.
-        
+
         Returns:
             List of scan details
         """
@@ -76,10 +75,10 @@ class DatabaseHelper:
     
     def get_scan_status(self, scan_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             Scan status details or None if scan not found
         """
@@ -110,10 +109,10 @@ class DatabaseHelper:
     
     def delete_scan(self, scan_id: str) -> bool:
         """Delete a scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -126,10 +125,10 @@ class DatabaseHelper:
     
     def stop_scan(self, scan_id: str) -> bool:
         """Stop a running scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             True if successful, False otherwise
         """
@@ -142,10 +141,10 @@ class DatabaseHelper:
     
     def get_scan_config(self, scan_id: str) -> Dict[str, str]:
         """Get configuration for a scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             Scan configuration
         """
@@ -153,7 +152,7 @@ class DatabaseHelper:
     
     def get_event_types(self) -> List[Tuple[str, str]]:
         """Get all event types.
-        
+
         Returns:
             List of event types (description, type)
         """
@@ -161,10 +160,10 @@ class DatabaseHelper:
     
     def get_scan_logs(self, scan_id: str) -> List[List[Any]]:
         """Get logs for a scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             List of log entries
         """
@@ -177,12 +176,12 @@ class DatabaseHelper:
         filter_fp: bool = False
     ) -> List[List[Any]]:
         """Get results for a scan.
-        
+
         Args:
             scan_id: Scan ID
             event_type: Optional event type to filter by
             filter_fp: Whether to filter out false positives
-            
+
         Returns:
             List of scan results
         """

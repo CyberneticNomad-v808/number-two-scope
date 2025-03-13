@@ -1,8 +1,7 @@
-"""
-SpiderFoot FastAPI Application
+"""SpiderFoot FastAPI Application.
 
-This module provides the application factory for creating and configuring
-the FastAPI application instance.
+This module provides the application factory for creating and
+configuring the FastAPI application instance.
 """
 
 import logging

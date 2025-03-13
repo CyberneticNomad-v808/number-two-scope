@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Scan Routes
+"""SpiderFoot FastAPI Scan Routes.
 
-This module defines routes for managing scans (create, list, delete, etc.).
+This module defines routes for managing scans (create, list, delete,
+etc.).
 """
 
 from typing import List, Optional

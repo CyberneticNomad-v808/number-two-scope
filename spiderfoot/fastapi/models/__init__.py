@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Models
+"""SpiderFoot FastAPI Models.
 
 This package contains Pydantic models for request/response validation.
 - scan: Scan-related models

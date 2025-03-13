@@ -160,7 +160,8 @@ class sfp_abstractapi(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def queryPhoneValidation(self, qry):
-        """Verify phone number and enrich with carrier and location information.
+        """Verify phone number and enrich with carrier and location
+        information.
 
         Args:
             qry (str): phone number

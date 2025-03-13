@@ -324,9 +324,10 @@ class sfp__stor_elasticsearch(SpiderFootPlugin):
         }
 
     def dbh(self, scanId):
-        """
-        Connect to the database. Since we're not using a database,
-        just initialize the Elasticsearch connection.
+        """Connect to the database.
+
+        Since we're not using a database, just initialize the
+        Elasticsearch connection.
         """
         self.setScanId(scanId)
         return self.initializeElasticsearch()

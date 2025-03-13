@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Configuration Routes
+"""SpiderFoot FastAPI Configuration Routes.
 
 This module defines routes for managing SpiderFoot configuration.
 """
@@ -24,14 +23,14 @@ async def save_settings(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Save system settings.
-    
+
     Args:
         request: FastAPI request
         allopts: JSON string of settings
         token: CSRF token
         configFile: Optional configuration file
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Redirect to settings page or error message
     """
@@ -52,12 +51,12 @@ async def save_settings_raw(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Save settings via raw API call.
-    
+
     Args:
         config_data: Configuration options
         token: CSRF token
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Response with status
     """
@@ -73,10 +72,10 @@ async def save_settings_raw(
 @router.get("/optsraw", response_model=Dict[str, Any])
 async def get_options_raw(sf_api: SpiderFootAPI = Depends(get_sf_api)):
     """Get raw configuration options.
-    
+
     Args:
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Dictionary of configuration options
     """

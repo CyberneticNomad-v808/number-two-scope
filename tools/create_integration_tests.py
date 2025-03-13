@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""
-Script to create integration test modules for SpiderFoot modules.
-This script will create integration tests that test the modules with real data,
-verifying that they integrate correctly with external services and APIs.
+"""Script to create integration test modules for SpiderFoot modules.
+
+This script will create integration tests that test the modules with
+real data, verifying that they integrate correctly with external
+services and APIs.
 """
 
 import os

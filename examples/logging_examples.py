@@ -7,7 +7,7 @@ from spiderfoot.logger import logListenerSetup, logWorkerSetup
 
 
 def example_basic_logging():
-    """Example of basic logging setup in the main thread"""
+    """Example of basic logging setup in the main thread."""
     # Step 1: Create a queue for log messages
     log_queue = queue.Queue()
 
@@ -30,7 +30,7 @@ def example_basic_logging():
 
 
 def worker_function(log_queue):
-    """Example worker function using the logger"""
+    """Example worker function using the logger."""
     # Set up the logger in this thread
     log = logWorkerSetup(log_queue)
 
@@ -43,7 +43,7 @@ def worker_function(log_queue):
 
 
 def example_multithreading():
-    """Example of using the logger in multiple threads"""
+    """Example of using the logger in multiple threads."""
     # Create a queue for log messages (shared between threads)
     log_queue = queue.Queue()
 
@@ -73,7 +73,7 @@ def example_multithreading():
 
 
 def scan_worker(log_queue, scan_id):
-    """Example worker function with scan ID"""
+    """Example worker function with scan ID."""
     # Set up the logger in this thread
     log = logWorkerSetup(log_queue)
 
@@ -89,7 +89,7 @@ def scan_worker(log_queue, scan_id):
 
 
 def example_multiprocessing():
-    """Example of using the logger with multiple processes"""
+    """Example of using the logger with multiple processes."""
     # Create a multiprocessing queue for log messages (shared between processes)
     log_queue = multiprocessing.Queue()
 
@@ -121,7 +121,7 @@ def example_multiprocessing():
 
 
 def module_specific_logging(log_queue):
-    """Example of module-specific logging"""
+    """Example of module-specific logging."""
     # Create a module-specific logger (inherits from root logger)
     logger = logging.getLogger("spiderfoot.modules.mymodule")
 

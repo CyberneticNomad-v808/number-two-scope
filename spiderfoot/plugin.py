@@ -1,5 +1,4 @@
-"""
-SpiderFoot plugin base module.
+"""SpiderFoot plugin base module.
 
 This module defines the base class for all SpiderFoot plugins.
 """
@@ -307,8 +306,8 @@ class SpiderFootPlugin:
         self.log.error(message)
 
     def _updateSocket(self, socksProxy: str) -> None:
-        """Hack to override module's use of socket, replacing it with
-        one that uses the supplied SOCKS server.
+        """Hack to override module's use of socket, replacing it with one that
+        uses the supplied SOCKS server.
 
         Args:
             socksProxy (str): SOCKS proxy
@@ -316,8 +315,11 @@ class SpiderFootPlugin:
         self.socksProxy = socksProxy
 
     def clearListeners(self) -> None:
-        """Used to clear any listener relationships, etc. This is needed because
-        Python seems to cache local variables even between threads."""
+        """Used to clear any listener relationships, etc.
+
+        This is needed because Python seems to cache local variables
+        even between threads.
+        """
 
         self._listenerModules = list()
         self._stopScanning = False
@@ -359,8 +361,8 @@ class SpiderFootPlugin:
         self._currentTarget = target
 
     def setDbh(self, dbh) -> None:
-        """Used to set the database handle, which is only to be used
-        by modules in very rare/exceptional cases (e.g. sfp__stor_db)
+        """Used to set the database handle, which is only to be used by modules
+        in very rare/exceptional cases (e.g. sfp__stor_db)
 
         Args:
             dbh (SpiderFootDb): database handle
@@ -410,8 +412,8 @@ class SpiderFootPlugin:
         return self._currentTarget
 
     def registerListener(self, listener) -> None:
-        """Listener modules which will get notified once we have data for them to
-        work with.
+        """Listener modules which will get notified once we have data for them
+        to work with.
 
         Args:
             listener: TBD
@@ -568,8 +570,8 @@ class SpiderFootPlugin:
 
     @property
     def running(self) -> bool:
-        """Indicates whether the module is currently processing data.
-        Modules that process data in pools/batches typically override this method.
+        """Indicates whether the module is currently processing data. Modules
+        that process data in pools/batches typically override this method.
 
         Returns:
             bool: True if the module is currently processing data.
@@ -580,7 +582,9 @@ class SpiderFootPlugin:
         )
 
     def watchedEvents(self) -> list:
-        """What events is this module interested in for input. The format is a list
+        """What events is this module interested in for input. The format is a
+        list.
+
         of event types that are applied to event types that this module wants to
         be notified of, or * if it wants everything.
         Will usually be overriden by the implementer, unless it is interested
@@ -593,9 +597,8 @@ class SpiderFootPlugin:
         return ["*"]
 
     def producedEvents(self) -> list:
-        """What events this module produces
-        This is to support the end user in selecting modules based on events
-        produced.
+        """What events this module produces This is to support the end user in
+        selecting modules based on events produced.
 
         Returns:
             list: list of events produced by this module
@@ -604,8 +607,8 @@ class SpiderFootPlugin:
         return []
 
     def handleEvent(self, sfEvent) -> None:
-        """Handle events to this module.
-        Will usually be overriden by the implementer, unless it doesn't handle any events.
+        """Handle events to this module. Will usually be overriden by the
+        implementer, unless it doesn't handle any events.
 
         Args:
             sfEvent (SpiderFootEvent): event
@@ -632,10 +635,8 @@ class SpiderFootPlugin:
         self.thread.start()
 
     def finish(self):
-        """Perform final/cleanup functions before module exits
-        Note that this function may be called multiple times
-        Overridden by the implementer
-        """
+        """Perform final/cleanup functions before module exits Note that this
+        function may be called multiple times Overridden by the implementer."""
 
         return
 
@@ -694,9 +695,8 @@ class SpiderFootPlugin:
                 self.incomingEventQueue = None
 
     def poolExecute(self, callback, *args, **kwargs) -> None:
-        """Execute a callback with the given args.
-        If we're in a storage module, execute normally.
-        Otherwise, use the shared thread pool.
+        """Execute a callback with the given args. If we're in a storage
+        module, execute normally. Otherwise, use the shared thread pool.
 
         Args:
             callback: function to call

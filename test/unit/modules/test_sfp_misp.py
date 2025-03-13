@@ -7,18 +7,14 @@ from spiderfoot import SpiderFootEvent, SpiderFootTarget
 
 @pytest.mark.usefixtures
 class TestModuleMisp(unittest.TestCase):
-    """
-    Test modules.sfp_misp
-    """
+    """Test modules.sfp_misp."""
 
     def test_opts(self):
         module = sfp_misp()
         self.assertEqual(len(module.opts), 7)
 
     def test_setup(self):
-        """
-        Test setup(self, sfc, userOpts=dict())
-        """
+        """Test setup(self, sfc, userOpts=dict())"""
         module = sfp_misp()
         module.setup(None, dict())
         self.assertIsNone(module.misp_event)
@@ -33,9 +29,7 @@ class TestModuleMisp(unittest.TestCase):
         self.assertEqual(module.producedEvents(), [])
 
     def test_handleEvent(self):
-        """
-        Test handleEvent(self, sfEvent)
-        """
+        """Test handleEvent(self, sfEvent)"""
         module = sfp_misp()
         
         module.setup(None, dict())

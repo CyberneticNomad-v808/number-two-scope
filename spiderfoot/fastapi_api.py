@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI API
+"""SpiderFoot FastAPI API.
 
 This module provides a simple interface to use SpiderFoot FastAPI
 functionality from other Python code.
@@ -23,9 +22,9 @@ def create_server(
     **kwargs
 ) -> None:
     """Create and run a SpiderFoot API server.
-    
+
     This is a convenience function that loads the config and runs the app.
-    
+
     Args:
         host: Host to listen on
         port: Port to listen on
@@ -33,7 +32,7 @@ def create_server(
         config_path: Path to configuration file
         enable_api_key: Enable API key authentication
         **kwargs: Additional configuration options
-        
+
     Returns:
         None
     """

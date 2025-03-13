@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Configuration Models
+"""SpiderFoot FastAPI Configuration Models.
 
 This module defines models for configuration-related operations.
 """

@@ -1662,21 +1662,47 @@ if __name__ == "__main__":
                       help="Enable API key authentication")
     parser.add_argument("--api-key", default=None, dest="api_key",
                       help="Specify API key for authentication (generated if not provided)")
+    parser.add_argument("--dbpath", default=None, dest="dbpath",
+                      help="Path to SpiderFoot database file")
                       
     args = parser.parse_args()
     
+    # Determine database path - if not provided, use a directory in the user's home
+    if args.dbpath:
+        db_path = args.dbpath
+    else:
+        import os
+        from pathlib import Path
+        # Create a .spiderfoot directory in the user's home directory if it doesn't exist
+        home_dir = str(Path.home())
+        sf_dir = os.path.join(home_dir, ".spiderfoot")
+        if not os.path.isdir(sf_dir):
+            try:
+                os.makedirs(sf_dir)
+            except Exception as e:
+                print(f"Failed to create SpiderFoot directory: {e}")
+                exit(1)
+        db_path = os.path.join(sf_dir, "spiderfoot.db")
+    
+    print(f"Using database: {db_path}")
+    
     # Initialize with default configuration
     defaultConfig = {
-        '__database': 'spiderfoot.db',  # Set default database path
-        '_debug': args.debug,           # Pass debug flag to configuration
+        '__database': db_path,      # Set default database path
+        '_debug': args.debug,       # Pass debug flag to configuration
     }
     
     # Initialize SpiderFoot with default config
     sf = SpiderFoot(defaultConfig)
     
     # Now get configuration from database
-    dbh = SpiderFootDb(defaultConfig)
-    config = sf.configUnserialize(dbh.configGet(), defaultConfig)
+    try:
+        dbh = SpiderFootDb(defaultConfig)
+        config = sf.configUnserialize(dbh.configGet(), defaultConfig)
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        print("Using default configuration instead.")
+        config = defaultConfig
     
     # Set up web interface configuration
     web_config = {

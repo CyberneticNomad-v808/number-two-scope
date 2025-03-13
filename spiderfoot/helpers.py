@@ -108,16 +108,16 @@ class SpiderFootHelpers:
         """
         import os
         from pathlib import Path
-        
+
         # Check if running from a Docker container
         if os.path.exists("/home/spiderfoot/log"):
             return "/home/spiderfoot/log"
-        
+
         # Default to the user's home directory
         home_dir = str(Path.home())
         log_dir = os.path.join(home_dir, ".spiderfoot", "log")
-        
+
         # Ensure log directory exists
         os.makedirs(log_dir, exist_ok=True)
-        
+
         return log_dir

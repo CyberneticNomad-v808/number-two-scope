@@ -342,14 +342,16 @@ def logListenerSetup(loggingQueue, sfConfig):
             # ...existing handler setup code...
             file_handlers.append(handler)
         except PermissionError:
-            print(f"Warning: Permission denied for log file {log_path}. Falling back to console logging.")
+            print(
+                f"Warning: Permission denied for log file {log_path}. Falling back to console logging.")
         except Exception as e:
             print(f"Warning: Failed to set up {log_level} log file: {e}")
 
     # If no file handlers could be created, ensure console logging works
     if not file_handlers:
         console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        console_handler.setFormatter(logging.Formatter(
+            '%(asctime)s [%(levelname)s] %(message)s'))
         console_handler.setLevel(logging.INFO)
         root_logger.addHandler(console_handler)
         print("Warning: All log files failed to initialize. Logging to console only.")

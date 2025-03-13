@@ -67,12 +67,12 @@ def main():
     parser.add_argument(
         '-F', '--fastapi', help='Use FastAPI web interface instead of CherryPy.', action='store_true')
     options = parser.parse_args()
-    
+
     # Create options dictionary for SpiderFoot initialization
     opts = {
         '_debug': options.debug
     }
-    
+
     # Load the default configuration from the config file
     sf = SpiderFoot(opts)
     sfConfig = sf.defaultConfig()

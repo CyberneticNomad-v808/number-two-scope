@@ -19,6 +19,9 @@ import threading
 import time
 import psycopg2
 import psycopg2.extras
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from spiderfoot.logconfig import get_module_logger
 
 
 class SpiderFootDb:
@@ -32,12 +35,13 @@ class SpiderFootDb:
 
     dbh = None
     conn = None
+    db_type = None
 
     # Prevent multithread access to database
     dbhLock = threading.RLock()
 
-    # Queries for creating the SpiderFoot database
-    createSchemaQueries = [
+    # Queries for creating the SpiderFoot database - SQLite version
+    createSchemaQueriesSQLite = [
         "PRAGMA journal_mode=WAL",
         "CREATE TABLE tbl_event_types ( \
             event       VARCHAR NOT NULL PRIMARY KEY, \
@@ -108,6 +112,79 @@ class SpiderFootDb:
         "CREATE INDEX idx_scan_logs ON tbl_scan_log (scan_instance_id)",
         "CREATE INDEX idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
         "CREATE INDEX idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
+    ]
+
+    # Queries for creating the SpiderFoot database - PostgreSQL version
+    createSchemaQueriesPostgreSQL = [
+        "CREATE TABLE IF NOT EXISTS tbl_event_types ( \
+            event       VARCHAR NOT NULL PRIMARY KEY, \
+            event_descr VARCHAR NOT NULL, \
+            event_raw   INT NOT NULL DEFAULT 0, \
+            event_type  VARCHAR NOT NULL \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_config ( \
+            scope   VARCHAR NOT NULL, \
+            opt     VARCHAR NOT NULL, \
+            val     VARCHAR NOT NULL, \
+            PRIMARY KEY (scope, opt) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_instance ( \
+            guid        VARCHAR NOT NULL PRIMARY KEY, \
+            name        VARCHAR NOT NULL, \
+            seed_target VARCHAR NOT NULL, \
+            created     INT DEFAULT 0, \
+            started     INT DEFAULT 0, \
+            ended       INT DEFAULT 0, \
+            status      VARCHAR NOT NULL \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_log ( \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            generated           INT NOT NULL, \
+            component           VARCHAR, \
+            type                VARCHAR NOT NULL, \
+            message             VARCHAR \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_config ( \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            component           VARCHAR NOT NULL, \
+            opt                 VARCHAR NOT NULL, \
+            val                 VARCHAR NOT NULL \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_results ( \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            hash                VARCHAR NOT NULL, \
+            type                VARCHAR NOT NULL REFERENCES tbl_event_types(event), \
+            generated           INT NOT NULL, \
+            confidence          INT NOT NULL DEFAULT 100, \
+            visibility          INT NOT NULL DEFAULT 100, \
+            risk                INT NOT NULL DEFAULT 0, \
+            module              VARCHAR NOT NULL, \
+            data                VARCHAR, \
+            false_positive      INT NOT NULL DEFAULT 0, \
+            source_event_hash  VARCHAR DEFAULT 'ROOT' \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results ( \
+            id                  VARCHAR NOT NULL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instances(guid), \
+            title               VARCHAR NOT NULL, \
+            rule_risk           VARCHAR NOT NULL, \
+            rule_id             VARCHAR NOT NULL, \
+            rule_name           VARCHAR NOT NULL, \
+            rule_descr          VARCHAR NOT NULL, \
+            rule_logic          VARCHAR NOT NULL \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_correlation_results_events ( \
+            correlation_id      VARCHAR NOT NULL REFERENCES tbl_scan_correlation_results(id), \
+            event_hash          VARCHAR NOT NULL REFERENCES tbl_scan_results(hash) \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_id ON tbl_scan_results (scan_instance_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_type ON tbl_scan_results (scan_instance_id, type)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_hash ON tbl_scan_results (scan_instance_id, hash)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_module ON tbl_scan_results(scan_instance_id, module)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_srchash ON tbl_scan_results (scan_instance_id, source_event_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_logs ON tbl_scan_log (scan_instance_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_correlation ON tbl_scan_correlation_results (scan_instance_id, id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
     ]
 
     eventDetails = [
@@ -358,202 +435,136 @@ class SpiderFootDb:
         ["WIKIPEDIA_PAGE_EDIT", "Wikipedia Page Edit", 0, "DESCRIPTOR"],
     ]
 
-    def __init__(self, opts: dict, init: bool = False) -> None:
-        """Initialize database and create handle to the database file.
-        Creates the database file if it does not exist.
-        Creates database schema if it does not exist.
+    def __init__(self, opts: Dict[str, Any], init: bool = False) -> None:
+        """Initialize SpiderFoot database
 
         Args:
-            opts (dict): must specify the database file path in the '__database' key
-            init (bool): initialise the database schema.
-                         if the database file does not exist this option will be ignored.
+            opts (dict): database connection options
+                        __database contains the database path for SQLite, or connection string for PostgreSQL
+            init (bool): initialize the database schema
 
         Raises:
             TypeError: arg type was invalid
             ValueError: arg value was invalid
             IOError: database I/O failed
         """
+        self.log = get_module_logger("db")
+        self.opts = opts
+        
+        database_connection = self.opts.get('__database', '')
 
-        if not isinstance(opts, dict):
-            raise TypeError(f"opts is {type(opts)}; expected dict()") from None
-        if not opts:
-            raise ValueError("opts is empty") from None
-        if not opts.get("__database"):
-            raise ValueError("opts['__database'] is empty") from None
+        if not database_connection:
+            raise ValueError("__database is empty")
 
-        # Validate database type
-        self.db_type = opts.get("__dbtype", "sqlite")
-        if self.db_type not in ["sqlite", "postgresql"]:
-            raise ValueError(f"Unsupported database type: {self.db_type}")
-
-        # Initialize SQLite or PostgreSQL connection
-        if self.db_type == "sqlite":
-            self._init_sqlite(opts, init)
-        elif self.db_type == "postgresql":
-            self._init_postgresql(opts, init)
-
-    def _init_sqlite(self, opts: dict, init: bool) -> None:
-        """Initialize SQLite database."""
-        database_path = opts["__database"]
-        Path(database_path).parent.mkdir(exist_ok=True, parents=True)
-
-        try:
-            dbh = sqlite3.connect(database_path)
-        except Exception as e:
-            raise IOError(
-                f"Error connecting to internal database {database_path}"
-            ) from e
-
-        if dbh is None:
-            raise IOError(
-                f"Could not connect to internal database, and could not create {database_path}"
-            ) from None
-
-        dbh.text_factory = str
-        self.conn = dbh
-        self.dbh = dbh.cursor()
-
-        def __dbregex__(qry: str, data: str) -> bool:
-            """Custom regex function for SQLite."""
+        # Check if it's a PostgreSQL connection string
+        if database_connection.startswith('postgresql://'):
+            self.db_type = "POSTGRESQL"
             try:
-                rx = re.compile(qry, re.IGNORECASE | re.DOTALL)
-                ret = rx.match(data)
-            except Exception:
-                return False
-            return ret is not None
-
-        with self.dbhLock:
-            try:
-                self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_config")
-                self.conn.create_function("REGEXP", 2, __dbregex__)
-            except sqlite3.Error:
-                init = True
+                self.log.debug(f"Connecting to PostgreSQL database: {database_connection}")
+                self.conn = psycopg2.connect(database_connection)
+                self.dbh = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                psycopg2.extras.register_uuid()
+            except Exception as e:
+                self.log.error(f"Error connecting to PostgreSQL database: {e}")
+                raise IOError(f"Error connecting to PostgreSQL database: {e}")
+        else:
+            self.db_type = "SQLITE"
+            # SQLite database connection
+            if database_connection == ":memory:":
+                self.log.debug("Using in-memory SQLite database")
+                self.conn = sqlite3.connect(database_connection, 
+                                          check_same_thread=False,
+                                          isolation_level=None)
+            else:
                 try:
-                    self.create()
+                    dbdir = database_connection
+                    if database_connection.endswith('.db'):
+                        dbdir = database_connection.rsplit('/', 1)[0]
+                    if not Path(dbdir).exists():
+                        Path(dbdir).mkdir(parents=True, exist_ok=True)
+                    
+                    self.log.debug(f"Connecting to SQLite database: {database_connection}")
+                    self.conn = sqlite3.connect(database_connection, 
+                                              check_same_thread=False,
+                                              isolation_level=None)
                 except Exception as e:
-                    raise IOError(
-                        "Tried to set up the SpiderFoot database schema, but failed"
-                    ) from e
+                    self.log.error(f"Error connecting to SQLite database: {e}")
+                    raise IOError(f"Error connecting to SQLite database: {e}")
 
-            try:
-                self.dbh.execute(
-                    "SELECT COUNT(*) FROM tbl_scan_correlation_results")
-            except sqlite3.Error:
-                try:
-                    for query in self.createSchemaQueries:
-                        if "correlation" in query:
-                            self.dbh.execute(query)
-                        self.conn.commit()
-                except sqlite3.Error:
-                    raise IOError(
-                        "Looks like you are running a pre-4.0 database. Unfortunately "
-                        "SpiderFoot wasn't able to migrate you, so you'll need to delete "
-                        "your SpiderFoot database in order to proceed."
-                    ) from None
+            # Database optimization
+            self.dbh = self.conn.cursor()
+            self.dbh.execute("PRAGMA synchronous = OFF")
+            self.dbh.execute("PRAGMA journal_mode = WAL")
+            self.dbh.execute("PRAGMA foreign_keys = ON")
+            self.dbh.execute("PRAGMA temp_store = MEMORY")
+            self.dbh.execute("PRAGMA cache_size = 800")
+            
+        self.conn.text_factory = str
 
-            if init:
-                for row in self.eventDetails:
-                    event, event_descr, event_raw, event_type = row
-                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
-                    try:
-                        self.dbh.execute(
-                            qry, (event, event_descr, event_raw, event_type)
-                        )
-                        self.conn.commit()
-                    except Exception:
-                        continue
-                self.conn.commit()
+        if init:
+            self.create_schema()
 
-    def _init_postgresql(self, opts: dict, init: bool) -> None:
-        """Initialize PostgreSQL database."""
+    def __del__(self) -> None:
+        """Close the database handle."""
         try:
-            self.conn = psycopg2.connect(opts["__database"])
-            self.dbh = self.conn.cursor(
-                cursor_factory=psycopg2.extras.DictCursor)
+            if self.dbh:
+                self.dbh.close()
+            if self.conn:
+                self.conn.close()
         except Exception as e:
-            raise IOError(
-                f"Error connecting to PostgreSQL database {opts['__database']}"
-            ) from e
-
-        with self.dbhLock:
-            try:
-                self.dbh.execute("SELECT COUNT(*) FROM tbl_scan_config")
-            except psycopg2.Error:
-                init = True
-                try:
-                    self.create()
-                except Exception as e:
-                    raise IOError(
-                        "Tried to set up the SpiderFoot database schema, but failed"
-                    ) from e
-
-            if init:
-                for row in self.eventDetails:
-                    event, event_descr, event_raw, event_type = row
-                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (%s, %s, %s, %s)"
-                    try:
-                        self.dbh.execute(
-                            qry, (event, event_descr, event_raw, event_type)
-                        )
-                        self.conn.commit()
-                    except Exception:
-                        continue
-                self.conn.commit()
-
-    #
-    # Back-end database operations
-    #
-
-    def create(self) -> None:
-        """Create the database schema.
-
-        Raises:
-            IOError: database I/O failed
-        """
-
-        with self.dbhLock:
-            try:
-                for qry in self.createSchemaQueries:
-                    self.dbh.execute(qry)
-                self.conn.commit()
-                for row in self.eventDetails:
-                    event, event_descr, event_raw, event_type = row
-                    qry = "INSERT INTO tbl_event_types (event, event_descr, event_raw, event_type) VALUES (?, ?, ?, ?)"
-                    self.dbh.execute(
-                        qry, (event, event_descr, event_raw, event_type))
-                self.conn.commit()
-            except (sqlite3.Error, psycopg2.Error) as e:
-                raise IOError(
-                    "SQL error encountered when setting up database") from e
+            self.log.error(f"Error closing database: {e}")
 
     def close(self) -> None:
         """Close the database handle."""
+        try:
+            if self.dbh:
+                self.dbh.close()
+            if self.conn:
+                self.conn.close()
+            self.dbh = None
+            self.conn = None
+        except Exception as e:
+            self.log.error(f"Error closing database: {e}")
 
-        with self.dbhLock:
-            self.dbh.close()
+    def create_schema(self) -> None:
+        """Create the database schema."""
+        try:
+            with self.dbhLock:
+                queries = self.createSchemaQueriesSQLite if self.db_type == "SQLITE" else self.createSchemaQueriesPostgreSQL
+                for query in queries:
+                    try:
+                        if not query.strip():
+                            continue
+                        self.dbh.execute(query)
+                    except Exception as e:
+                        # If the error is because the table already exists, we can ignore it
+                        if "already exists" not in str(e).lower():
+                            self.log.error(f"Error creating schema with query {query}: {e}")
+                            raise
+                self.conn.commit()
+                self.log.info("Database schema created successfully")
+        except Exception as e:
+            self.log.error(f"Error creating database schema: {e}")
+            raise IOError(f"Error creating database schema: {e}")
 
-    def vacuumDB(self) -> None:
-        """Vacuum the database. Clears unused database file pages.
-
+    def vacuumDB(self) -> bool:
+        """Vacuum the database.
+        
         Returns:
             bool: success
-
-        Raises:
-            IOError: database I/O failed
         """
-        with self.dbhLock:
-            try:
-                if self.db_type == "sqlite":
+        try:
+            with self.dbhLock:
+                self.log.info("Vacuuming database")
+                if self.db_type == "SQLITE":
                     self.dbh.execute("VACUUM")
-                elif self.db_type == "postgresql":
+                else:
                     self.dbh.execute("VACUUM FULL")
                 self.conn.commit()
                 return True
-            except (sqlite3.Error, psycopg2.Error) as e:
-                raise IOError(
-                    "SQL error encountered when vacuuming the database"
-                ) from e
-        return False
+        except Exception as e:
+            self.log.error(f"Error vacuuming database: {e}")
+            return False
 
     def search(self, criteria: dict, filterFp: bool = False) -> list:
         """Search database.

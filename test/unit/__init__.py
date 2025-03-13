@@ -1,1 +1,6 @@
-# This file makes the unit directory a proper Python package
+# Unit test package for SpiderFoot
+"""
+SpiderFoot unit test package.
+
+This package contains unit tests for the core components of SpiderFoot.
+"""

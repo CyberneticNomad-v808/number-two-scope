@@ -1,3 +1,9 @@
+"""
+SpiderFoot plugin base module.
+
+This module defines the base class for all SpiderFoot plugins.
+"""
+
 from contextlib import suppress
 import io
 import logging
@@ -8,10 +14,13 @@ import threading
 from time import sleep
 import traceback
 import inspect
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from .threadpool import SpiderFootThreadPool
 from spiderfoot import SpiderFootDb, SpiderFootEvent
+from spiderfoot.logconfig import get_module_logger
+from spiderfoot.error_handling import error_handler, handle_exception
+from spiderfoot.request_handler import RequestHandler
 
 # begin logging overrides
 # these are copied from the python logging module

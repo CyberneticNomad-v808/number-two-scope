@@ -1,296 +1,145 @@
-import queue
-import logging
+"""
+SpiderFoot thread pool module.
+
+This module provides thread pooling capabilities for SpiderFoot modules
+to enable efficient parallel processing while maintaining control over
+resource usage.
+"""
+
+import concurrent.futures
 import threading
-from time import sleep
-from contextlib import suppress
-from .logger import logWorkerSetup
+import traceback
+from typing import Any, Callable, Dict, Optional, List, Set
+
+from spiderfoot.logconfig import get_module_logger
 
 
 class SpiderFootThreadPool:
-    """
-    Each thread in the pool is spawned only once, and reused for best performance.
-
-    Example 1: using map()
-        with SpiderFootThreadPool(self.opts["_maxthreads"]) as pool:
-            # callback("a", "arg1"), callback("b", "arg1"), ...
-            for result in pool.map(
-                    callback,
-                    ["a", "b", "c", "d"],
-                    "arg1",
-                    taskName="sfp_testmodule"
-                    saveResult=True
-                ):
-                yield result
-
-    Example 2: using submit()
-        with SpiderFootThreadPool(self.opts["_maxthreads"]) as pool:
-            pool.start()
-            # callback("arg1"), callback("arg2")
-            pool.submit(callback, "arg1", taskName="sfp_testmodule", saveResult=True)
-            pool.submit(callback, "arg2", taskName="sfp_testmodule", saveResult=True)
-            for result in pool.shutdown()["sfp_testmodule"]:
-                yield result
+    """Thread pool for SpiderFoot.
+    
+    Manages a pool of worker threads to handle tasks efficiently
+    with better control over resource usage and error handling.
     """
 
-    def __init__(
-        self, threads: int = 100, qsize: int = 10, name: str = "", logging_queue=None
-    ) -> None:
-        """Initialize the SpiderFootThreadPool class.
-
+    def __init__(self, max_workers: Optional[int] = None, name: str = "SpiderFoot"):
+        """Initialize the thread pool.
+        
         Args:
-            threads (int): Max number of threads
-            qsize (int): Queue size
-            name (str): Name
-            logging_queue: Queue for thread-safe logging
+            max_workers: Maximum number of worker threads. If None, uses default based on system.
+            name: Name for the thread pool for identification in logs
         """
-        self.logging_queue = logging_queue
-        self.log = (
-            logWorkerSetup(logging_queue)
-            if logging_queue
-            else logging.getLogger(f"spiderfoot.{__name__}")
-        )
-        self.threads = int(threads)
-        self.qsize = int(qsize)
-        self.pool = [None] * self.threads
-        self.name = str(name)
-        self.inputThread = None
-        self.inputQueues = dict()
-        self.outputQueues = dict()
-        self._stop = False
-        self._lock = threading.Lock()
-
-    def start(self) -> None:
-        self.log.debug(
-            f'Starting thread pool "{self.name}" with {self.threads:,} threads'
-        )
-        for i in range(self.threads):
-            t = ThreadPoolWorker(
-                pool=self,
-                name=f"{self.name}_worker_{i + 1}",
-                logging_queue=self.logging_queue,
-            )
-            t.start()
-            self.pool[i] = t
-
-    @property
-    def stop(self) -> bool:
-        return self._stop
-
-    @stop.setter
-    def stop(self, val: bool):
-        assert val in (True, False), "stop must be either True or False"
-        for t in self.pool:
-            with suppress(Exception):
-                t.stop = val
-        self._stop = val
-
-    def shutdown(self, wait: bool = True) -> dict:
-        """Shut down the pool.
-
+        self.log = get_module_logger("threadpool")
+        self.name = name
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, 
+                                                             thread_name_prefix=f"sf-{name}")
+        self.futures: Dict[str, Dict[concurrent.futures.Future, Dict[str, Any]]] = {}
+        self.lock = threading.RLock()
+        self.log.debug(f"Thread pool '{name}' initialized with max_workers={max_workers}")
+        
+    def submit(self, fn: Callable, *args, taskName: str = "default", maxThreads: int = 5, **kwargs) -> concurrent.futures.Future:
+        """Submit a task to the thread pool.
+        
         Args:
-            wait (bool): Whether to wait for the pool to finish executing
-
+            fn: Function to execute
+            args: Positional arguments for the function
+            taskName: Name for grouping related tasks
+            maxThreads: Maximum number of concurrent tasks for this task name
+            kwargs: Keyword arguments for the function
+            
         Returns:
-            results (dict): (unordered) results in the format: {"taskName": [returnvalue1, returnvalue2, ...]}
+            Future object representing the execution of the callable
         """
-        results = dict()
-        self.log.debug(
-            f'Shutting down thread pool "{self.name}" with wait={wait}')
-        if wait:
-            while not self.finished and not self.stop:
-                with self._lock:
-                    outputQueues = list(self.outputQueues)
-                for taskName in outputQueues:
-                    moduleResults = list(self.results(taskName))
-                    try:
-                        results[taskName] += moduleResults
-                    except KeyError:
-                        results[taskName] = moduleResults
-                sleep(0.1)
-        self.stop = True
-        # make sure input queues are empty
-        with self._lock:
-            inputQueues = list(self.inputQueues.values())
-        for q in inputQueues:
-            with suppress(Exception):
-                while 1:
-                    q.get_nowait()
-            with suppress(Exception):
-                q.close()
-        # make sure output queues are empty
-        with self._lock:
-            outputQueues = list(self.outputQueues.items())
-        for taskName, q in outputQueues:
-            moduleResults = list(self.results(taskName))
-            try:
-                results[taskName] += moduleResults
-            except KeyError:
-                results[taskName] = moduleResults
-            with suppress(Exception):
-                q.close()
-        return results
-
-    def submit(self, callback, *args, **kwargs) -> None:
-        """Submit a function call to the pool.
-        The "taskName" and "maxThreads" arguments are optional.
-
+        with self.lock:
+            if taskName not in self.futures:
+                self.futures[taskName] = {}
+                
+            # Clean up completed tasks
+            completed = [future for future in self.futures[taskName] if future.done()]
+            for future in completed:
+                self.futures[taskName].pop(future, None)
+                
+            # Check if we're at the maximum thread count for this task name
+            if len(self.futures[taskName]) >= maxThreads:
+                self.log.debug(f"Max threads {maxThreads} reached for task {taskName}. Waiting...")
+                # Wait for a task to complete
+                if self.futures[taskName]:
+                    done, _ = concurrent.futures.wait(
+                        self.futures[taskName], 
+                        return_when=concurrent.futures.FIRST_COMPLETED
+                    )
+                    for future in done:
+                        self.futures[taskName].pop(future, None)
+            
+            # Submit new task
+            future = self.executor.submit(self._wrap_fn, fn, args, kwargs, taskName)
+            self.futures[taskName][future] = {"name": taskName, "function": fn.__name__}
+            
+            return future
+            
+    def _wrap_fn(self, fn: Callable, args: tuple, kwargs: dict, task_name: str) -> Any:
+        """Wrap the function call to handle exceptions and logging.
+        
         Args:
-            callback (function): callback function
-            *args: Passed through to callback
-            **kwargs: Passed through to callback, except for taskName and maxThreads
+            fn: Function to execute
+            args: Positional arguments
+            kwargs: Keyword arguments
+            task_name: Name of the task
+            
+        Returns:
+            Result of the function call
         """
-        taskName = kwargs.get("taskName", "default")
-        maxThreads = kwargs.pop("maxThreads", 100)
-        # block if this module's thread limit has been reached
-        while self.countQueuedTasks(taskName) >= maxThreads:
-            sleep(0.01)
-            continue
-        self.log.debug(
-            f'Submitting function "{callback.__name__}" from module "{taskName}" to thread pool "{self.name}"'
-        )
-        self.inputQueue(taskName).put((callback, args, kwargs))
-
+        try:
+            self.log.debug(f"Starting task {task_name}: {fn.__name__}")
+            result = fn(*args, **kwargs)
+            self.log.debug(f"Completed task {task_name}: {fn.__name__}")
+            return result
+        except Exception as e:
+            self.log.error(f"Error in task {task_name}: {fn.__name__} - {e}")
+            self.log.debug(f"Error details: {traceback.format_exc()}")
+            raise
+            
     def countQueuedTasks(self, taskName: str) -> int:
-        """For the specified task, returns the number of queued function calls
-        plus the number of functions which are currently executing
-
+        """Count the number of queued tasks for a specific task name.
+        
         Args:
-            taskName (str): Name of task
-
+            taskName: Name of the task group
+            
         Returns:
-            int: the number of queued function calls plus the number of functions which are currently executing
+            int: Number of queued tasks
         """
-        queuedTasks = 0
-        with suppress(Exception):
-            queuedTasks += self.inputQueues[taskName].qsize()
-        runningTasks = 0
-        for t in self.pool:
-            with suppress(Exception):
-                if t.taskName == taskName:
-                    runningTasks += 1
-        return queuedTasks + runningTasks
-
-    def inputQueue(self, taskName: str = "default") -> str:
-        try:
-            return self.inputQueues[taskName]
-        except KeyError:
-            self.inputQueues[taskName] = queue.Queue(self.qsize)
-            return self.inputQueues[taskName]
-
-    def outputQueue(self, taskName: str = "default") -> str:
-        try:
-            return self.outputQueues[taskName]
-        except KeyError:
-            self.outputQueues[taskName] = queue.Queue(self.qsize)
-            return self.outputQueues[taskName]
-
-    def map(self, callback, iterable, *args, **kwargs) -> None:  # noqa: A003
-        """map.
-
+        with self.lock:
+            if taskName not in self.futures:
+                return 0
+            return len(self.futures[taskName])
+            
+    def waitForCompletion(self, taskName: Optional[str] = None) -> None:
+        """Wait for all tasks to complete.
+        
         Args:
-            callback: the function to thread
-            iterable: each entry will be passed as the first argument to the function
-            args: additional arguments to pass to callback function
-            kwargs: keyword arguments to pass to callback function
-
-        Yields:
-            return values from completed callback function
+            taskName: If specified, only wait for tasks with this name
         """
-        taskName = kwargs.get("taskName", "default")
-        self.inputThread = threading.Thread(
-            target=self.feedQueue, args=(callback, iterable, args, kwargs)
-        )
-        self.inputThread.start()
-        self.start()
-        sleep(0.1)
-        yield from self.results(taskName, wait=True)
-
-    def results(self, taskName: str = "default", wait: bool = False) -> None:
-        while 1:
-            result = False
-            with suppress(Exception):
-                while 1:
-                    yield self.outputQueue(taskName).get_nowait()
-                    result = True
-            if self.countQueuedTasks(taskName) == 0 or not wait:
-                break
-            if not result:
-                # sleep briefly to save CPU
-                sleep(0.1)
-
-    def feedQueue(self, callback, iterable, args, kwargs) -> None:
-        for i in iterable:
-            if self.stop:
-                break
-            self.submit(callback, i, *args, **kwargs)
-
-    @property
-    def finished(self):
-        if self.stop:
-            return True
-
-        finishedThreads = [not t.busy for t in self.pool if t is not None]
-        try:
-            inputThreadAlive = self.inputThread.is_alive()
-        except AttributeError:
-            inputThreadAlive = False
-
-        inputQueuesEmpty = [q.empty() for q in self.inputQueues.values()]
-        return not inputThreadAlive and all(inputQueuesEmpty) and all(finishedThreads)
+        with self.lock:
+            if taskName:
+                if taskName in self.futures and self.futures[taskName]:
+                    self.log.debug(f"Waiting for {len(self.futures[taskName])} tasks to complete for {taskName}")
+                    concurrent.futures.wait(self.futures[taskName])
+            else:
+                for name, futures_dict in self.futures.items():
+                    if futures_dict:
+                        self.log.debug(f"Waiting for {len(futures_dict)} tasks to complete for {name}")
+                        concurrent.futures.wait(futures_dict)
+                        
+    def shutdown(self, wait: bool = True) -> None:
+        """Shutdown the thread pool.
+        
+        Args:
+            wait: If True, wait for pending tasks to complete
+        """
+        self.log.debug(f"Shutting down thread pool '{self.name}'")
+        self.executor.shutdown(wait=wait)
 
     def __enter__(self):
         return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.shutdown()
-
-
-class ThreadPoolWorker(threading.Thread):
-    def __init__(self, pool, name: str = None, logging_queue=None) -> None:
-        self.logging_queue = logging_queue
-        self.log = (
-            logWorkerSetup(logging_queue)
-            if logging_queue
-            else logging.getLogger(f"spiderfoot.{__name__}")
-        )
-        self.pool = pool
-        self.taskName = ""  # which module submitted the callback
-        self.busy = False
-        self.stop = False
-
-        super().__init__(name=name)
-
-    def run(self) -> None:
-        # Round-robin through each module's input queue
-        while not self.stop:
-            ran = False
-            with self.pool._lock:
-                inputQueues = list(self.pool.inputQueues.values())
-            for q in inputQueues:
-                if self.stop:
-                    break
-                try:
-                    self.busy = True
-                    callback, args, kwargs = q.get_nowait()
-                    self.taskName = kwargs.pop("taskName", "default")
-                    saveResult = kwargs.pop("saveResult", False)
-                    try:
-                        result = callback(*args, **kwargs)
-                        ran = True
-                    except Exception:  # noqa: B902
-                        import traceback
-
-                        self.log.error(
-                            f"Error in thread worker {self.name}: {traceback.format_exc()}"
-                        )
-                        break
-                    if saveResult:
-                        self.pool.outputQueue(self.taskName).put(result)
-                except queue.Empty:
-                    self.busy = False
-                finally:
-                    self.busy = False
-                    self.taskName = ""
-            # sleep briefly to save CPU
-            if not ran:
-                sleep(0.05)
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown(wait=True)

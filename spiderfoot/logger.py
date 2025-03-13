@@ -20,6 +20,13 @@ from logging.handlers import (
 )
 
 from spiderfoot import SpiderFootDb, SpiderFootHelpers
+from spiderfoot.logconfig import (
+    configure_root_logger,
+    get_module_logger,
+    setup_file_logging,
+    get_log_paths,
+    get_log_level_from_config
+)
 
 
 class SafeQueueListener(QueueListener):
@@ -188,9 +195,7 @@ class SpiderFootLogger:
         self._logger.critical(message)
 
 
-def logListenerSetup(
-    loggingQueue, opts: dict = None
-) -> "logging.handlers.QueueListener":
+def logListenerSetup(loggingQueue, opts: dict = None) -> "logging.handlers.QueueListener":
     """Create and start a SpiderFoot log listener in its own thread.
 
     This function sets up a centralized logging system that safely handles logs
@@ -299,3 +304,77 @@ def stop_listener(listener: "logging.handlers.QueueListener") -> None:
     """
     with suppress(Exception):
         listener.stop()
+
+
+def logListenerSetup(loggingQueue: multiprocessing.Queue, config: Dict[str, Any] = None) -> None:
+    """Set up and start the logging listener process.
+    
+    Args:
+        loggingQueue (multiprocessing.Queue): Queue for log messages
+        config (dict): SpiderFoot config options
+    """
+    debug = config.get('_debug', False) if config else False
+    
+    # Configure the root logger
+    configure_root_logger(debug=debug)
+    
+    # Get paths for log files
+    log_paths = get_log_paths()
+    
+    # Set up file logging
+    if config and config.get('__logging', True):
+        # Debug logs
+        setup_file_logging(log_paths['debug'], level=logging.DEBUG)
+        
+        # Error logs
+        error_handler = logging.FileHandler(log_paths['error'])
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+        logging.getLogger().addHandler(error_handler)
+    
+    # Start the listener process
+    listener = logging.handlers.QueueListener(
+        loggingQueue,
+        *logging.getLogger().handlers
+    )
+    listener.start()
+
+def logWorkerSetup(loggingQueue: multiprocessing.Queue) -> None:
+    """Set up logging for a worker process.
+    
+    Args:
+        loggingQueue (multiprocessing.Queue): Queue for log messages
+    """
+    # Configure the root logger with a queue handler
+    root = logging.getLogger()
+    
+    # Remove any existing handlers to prevent duplicate logging
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+    
+    # Add queue handler
+    queue_handler = logging.handlers.QueueHandler(loggingQueue)
+    root.addHandler(queue_handler)
+    
+    # Set level to DEBUG to capture all logs - the actual filtering happens at the listener
+    root.setLevel(logging.DEBUG)
+
+def logEvent(instance_id: str, classification: str, message: str, module: str = None) -> None:
+    """Log an event to the appropriate logger.
+    
+    Args:
+        instance_id (str): Scan instance ID
+        classification (str): Log level (INFO, WARNING, ERROR, etc.)
+        message (str): Log message
+        module (str): Module name
+    """
+    if not module:
+        module = "spiderfoot"
+    
+    logger = get_module_logger(module)
+    
+    log_level = getattr(logging, classification.upper(), None)
+    if not isinstance(log_level, int):
+        log_level = logging.INFO
+    
+    logger.log(log_level, f"[{instance_id}] {message}")

@@ -19,6 +19,7 @@ from logging.handlers import (
     TimedRotatingFileHandler,
 )
 import multiprocessing  # Add missing import
+from typing import Dict, Any  # Add missing imports for type annotations
 
 from spiderfoot import SpiderFootDb, SpiderFootHelpers
 from spiderfoot.logconfig import (

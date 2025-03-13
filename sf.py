@@ -298,7 +298,7 @@ def main():
 def start():
     try:
         uvicorn_kwargs = {
-            'host': args.host, 
+            'host': args.host,
             'port': args.port,
             'log_level': "debug" if args.debug else "info"
         }

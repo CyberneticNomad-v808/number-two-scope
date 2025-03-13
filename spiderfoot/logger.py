@@ -18,6 +18,7 @@ from logging.handlers import (
     QueueListener,
     TimedRotatingFileHandler,
 )
+import multiprocessing  # Add missing import
 
 from spiderfoot import SpiderFootDb, SpiderFootHelpers
 from spiderfoot.logconfig import (

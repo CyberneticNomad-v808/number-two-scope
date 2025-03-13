@@ -21,13 +21,13 @@ def create_error_response(
     params: Optional[Dict[str, Any]] = None
 ) -> JSONResponse:
     """Create a standardized error response.
-    
+
     Args:
         message: Error message
         status_code: HTTP status code
         code: Error code for client reference
         params: Additional parameters for the error
-        
+
     Returns:
         JSONResponse with the error details
     """
@@ -37,7 +37,7 @@ def create_error_response(
 
 def setup_error_handlers(app: FastAPI) -> None:
     """Setup global exception handlers for the FastAPI application.
-    
+
     Args:
         app: FastAPI application instance
     """

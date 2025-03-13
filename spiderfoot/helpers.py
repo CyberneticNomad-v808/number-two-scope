@@ -101,9 +101,8 @@ class SpiderFootHelpers:
 
     @staticmethod
     def logPath() -> str:
-        """
-        Return the path to the log directory.
-        
+        """Return the path to the log directory.
+
         Returns:
             str: Path to the SpiderFoot log directory
         """

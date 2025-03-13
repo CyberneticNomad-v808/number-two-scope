@@ -412,9 +412,9 @@ class SpiderFootHelpers:
         """
         if not wordlists:
             wordlists = ["english"]
-        
+
         words = set()
-        
+
         for wordlist in wordlists:
             try:
                 with (
@@ -425,8 +425,9 @@ class SpiderFootHelpers:
                     for w in dict_file.readlines():
                         words.add(w.strip().lower().split("/")[0])
             except Exception as e:
-                raise IOError(f"Could not read wordlist file '{wordlist}.dict'") from e
-                
+                raise IOError(
+                    f"Could not read wordlist file '{wordlist}.dict'") from e
+
         return words
 
     @staticmethod

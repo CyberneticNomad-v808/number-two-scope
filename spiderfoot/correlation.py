@@ -61,13 +61,16 @@ class SpiderFootCorrelator:
         if isinstance(ruleset, list):
             self.ruleset = {}
             for item in ruleset:
-                if isinstance(item, dict) and 'id' in item:
-                    self.ruleset[item['id']] = item
+                if isinstance(item, dict) and "id" in item:
+                    self.ruleset[item["id"]] = item
                 else:
                     # Give it a random ID
                     import random
                     import string
-                    random_id = ''.join(random.choice(string.ascii_lowercase) for i in range(10))
+
+                    random_id = "".join(
+                        random.choice(string.ascii_lowercase) for i in range(10)
+                    )
                     self.ruleset[random_id] = item
         else:
             self.ruleset = ruleset or {}

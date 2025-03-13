@@ -262,9 +262,12 @@ class SpiderFootPlugin:
         if isinstance(opts, str):
             try:
                 import json
+
                 self._opts = json.loads(opts)
             except Exception:
-                self._opts = {"_name": opts}  # Set a minimal dictionary if parsing fails
+                self._opts = {
+                    "_name": opts
+                }  # Set a minimal dictionary if parsing fails
         else:
             self._opts = opts
         self.thread = None

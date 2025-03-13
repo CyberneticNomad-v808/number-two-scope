@@ -147,9 +147,7 @@ class sfp_rocketreach(SpiderFootPlugin):
         query_type = (
             "email"
             if eventName == "EMAILADDR"
-            else "domain"
-            if eventName == "DOMAIN_NAME"
-            else None
+            else "domain" if eventName == "DOMAIN_NAME" else None
         )
 
         if not query_type:

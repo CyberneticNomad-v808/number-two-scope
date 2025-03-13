@@ -9,31 +9,31 @@ def fix_pep8_recursively(directory):
         for file in files:
             if file.endswith(".py"):
                 filepath = os.path.join(root, file)
-                print(f"Checking/Fixing: {filepath}")
+                # print(f"Checking/Fixing: {filepath}")
 
                 # Black (for overall formatting)
-                try:
-                    subprocess.run(["black", filepath],
-                                   check=True, capture_output=True)
-                    print("  - Black applied.")
-                except subprocess.CalledProcessError as e:
-                    print(f"  - Black failed: {e.stderr.decode()}")
+                # try:
+                #    subprocess.run(["black", filepath],
+                #                   check=True, capture_output=True)
+                #    print("  - Black applied.")
+                # except subprocess.CalledProcessError as e:
+                #    print(f"  - Black failed: {e.stderr.decode()}")
 
                 # Ruff (for specific fixes)
-                try:
-                    subprocess.run(
-                        ["ruff", "format", filepath],
-                        check=True,
-                        capture_output=True,
-                    )
-                    subprocess.run(
-                        ["ruff", "check", "--fix", filepath],
-                        check=True,
-                        capture_output=True,
-                    )
-                    print("  - Ruff applied.")
-                except subprocess.CalledProcessError as e:
-                    print(f"  - Ruff failed: {e.stderr.decode()}")
+                # try:
+                # subprocess.run(
+                #    ["ruff", "format", filepath],
+                #    check=True,
+                #    capture_output=True,
+                # )
+                # subprocess.run(
+                #    ["ruff", "check", "--fix", filepath],
+                #    check=True,
+                #    capture_output=True,
+                # )
+                # print("  - Ruff applied.")
+                # except subprocess.CalledProcessError as e:
+                # print(f"  - Ruff failed: {e.stderr.decode()}")
 
                 # autopep8 (for remaining issues)
                 try:

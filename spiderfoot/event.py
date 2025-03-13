@@ -34,7 +34,7 @@ class SpiderFootEvent:
         eventType: str,
         data: str,
         module: str,
-        sourceEvent: Optional['SpiderFootEvent'] = None,
+        sourceEvent: Optional["SpiderFootEvent"] = None,
         confidence: int = 100,
         visibility: int = 100,
         risk: int = 0,
@@ -57,7 +57,7 @@ class SpiderFootEvent:
             ValueError: Argument value was invalid
         """
         self.log = get_module_logger("event")
-        
+
         # Validate eventType
         if not isinstance(eventType, str):
             raise TypeError(f"eventType is {type(eventType)}; expected str()")
@@ -78,19 +78,25 @@ class SpiderFootEvent:
 
         # Validate sourceEvent
         if sourceEvent and not isinstance(sourceEvent, SpiderFootEvent):
-            raise TypeError(f"sourceEvent is {type(sourceEvent)}; expected SpiderFootEvent()")
+            raise TypeError(
+                f"sourceEvent is {type(sourceEvent)}; expected SpiderFootEvent()"
+            )
 
         # Validate confidence
         if not isinstance(confidence, int):
-            raise TypeError(f"confidence is {type(confidence)}; expected int()")
+            raise TypeError(
+                f"confidence is {type(confidence)}; expected int()")
         if not 0 <= confidence <= 100:
-            raise ValueError(f"confidence value is {confidence}; expected 0-100")
+            raise ValueError(
+                f"confidence value is {confidence}; expected 0-100")
 
         # Validate visibility
         if not isinstance(visibility, int):
-            raise TypeError(f"visibility is {type(visibility)}; expected int()")
+            raise TypeError(
+                f"visibility is {type(visibility)}; expected int()")
         if not 0 <= visibility <= 100:
-            raise ValueError(f"visibility value is {visibility}; expected 0-100")
+            raise ValueError(
+                f"visibility value is {visibility}; expected 0-100")
 
         # Validate risk
         if not isinstance(risk, int):
@@ -119,48 +125,49 @@ class SpiderFootEvent:
 
         # Create a unique hash of the event to avoid reporting the same data multiple times
         self.hash = self._generateHash()
-        
-        self.log.debug(f"Created event {eventType}: {data[:30]}... from {module}")
-        
+
+        self.log.debug(
+            f"Created event {eventType}: {data[:30]}... from {module}")
+
     def _generateHash(self) -> str:
         """Generate a unique hash for this event.
-        
+
         Returns:
             str: SHA256 hash of the event data
         """
         sha256 = hashlib.sha256()
-        
-        # Different event types and modules may have the same data, so include those 
+
+        # Different event types and modules may have the same data, so include those
         # fields in the hash calculation
         hash_components = (
             f"{self.eventType}{self.data}{self.module}{self.sourceEventHash}"
-        ).encode('utf-8', errors='replace')
-        
+        ).encode("utf-8", errors="replace")
+
         sha256.update(hash_components)
         return sha256.hexdigest()
 
     def asDict(self) -> Dict[str, Any]:
         """Get event as dictionary.
-        
+
         Returns:
             dict: Event as a dictionary
         """
         return {
-            'type': self.eventType,
-            'data': self.data,
-            'module': self.module,
-            'confidence': self.confidence,
-            'visibility': self.visibility,
-            'risk': self.risk,
-            'hash': self.hash,
-            'sourceEventHash': self.sourceEventHash,
-            'actualSource': self.actualSource,
-            'generated': self.generated
+            "type": self.eventType,
+            "data": self.data,
+            "module": self.module,
+            "confidence": self.confidence,
+            "visibility": self.visibility,
+            "risk": self.risk,
+            "hash": self.hash,
+            "sourceEventHash": self.sourceEventHash,
+            "actualSource": self.actualSource,
+            "generated": self.generated,
         }
-        
+
     def __str__(self) -> str:
         """Get a string representation of the event.
-        
+
         Returns:
             str: String representation
         """
@@ -169,24 +176,24 @@ class SpiderFootEvent:
             f"data='{self.data[:30]}{'...' if len(self.data) > 30 else ''}', "
             f"module='{self.module}')>"
         )
-    
+
     def __eq__(self, other: Any) -> bool:
         """Compare events.
-        
+
         Args:
             other: Another event to compare with
-            
+
         Returns:
             bool: True if events are equal
         """
         if not isinstance(other, SpiderFootEvent):
             return False
-            
+
         return self.hash == other.hash
-    
+
     def __hash__(self) -> int:
         """Get hash of event.
-        
+
         Returns:
             int: Hash value
         """

@@ -450,19 +450,22 @@ class SpiderFootDb:
         """
         self.log = get_module_logger("db")
         self.opts = opts
-        
-        database_connection = self.opts.get('__database', '')
+
+        database_connection = self.opts.get("__database", "")
 
         if not database_connection:
             raise ValueError("__database is empty")
 
         # Check if it's a PostgreSQL connection string
-        if database_connection.startswith('postgresql://'):
+        if database_connection.startswith("postgresql://"):
             self.db_type = "POSTGRESQL"
             try:
-                self.log.debug(f"Connecting to PostgreSQL database: {database_connection}")
+                self.log.debug(
+                    f"Connecting to PostgreSQL database: {database_connection}"
+                )
                 self.conn = psycopg2.connect(database_connection)
-                self.dbh = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                self.dbh = self.conn.cursor(
+                    cursor_factory=psycopg2.extras.DictCursor)
                 psycopg2.extras.register_uuid()
             except Exception as e:
                 self.log.error(f"Error connecting to PostgreSQL database: {e}")
@@ -472,21 +475,25 @@ class SpiderFootDb:
             # SQLite database connection
             if database_connection == ":memory:":
                 self.log.debug("Using in-memory SQLite database")
-                self.conn = sqlite3.connect(database_connection, 
-                                          check_same_thread=False,
-                                          isolation_level=None)
+                self.conn = sqlite3.connect(
+                    database_connection, check_same_thread=False, isolation_level=None
+                )
             else:
                 try:
                     dbdir = database_connection
-                    if database_connection.endswith('.db'):
-                        dbdir = database_connection.rsplit('/', 1)[0]
+                    if database_connection.endswith(".db"):
+                        dbdir = database_connection.rsplit("/", 1)[0]
                     if not Path(dbdir).exists():
                         Path(dbdir).mkdir(parents=True, exist_ok=True)
-                    
-                    self.log.debug(f"Connecting to SQLite database: {database_connection}")
-                    self.conn = sqlite3.connect(database_connection, 
-                                              check_same_thread=False,
-                                              isolation_level=None)
+
+                    self.log.debug(
+                        f"Connecting to SQLite database: {database_connection}"
+                    )
+                    self.conn = sqlite3.connect(
+                        database_connection,
+                        check_same_thread=False,
+                        isolation_level=None,
+                    )
                 except Exception as e:
                     self.log.error(f"Error connecting to SQLite database: {e}")
                     raise IOError(f"Error connecting to SQLite database: {e}")
@@ -498,7 +505,7 @@ class SpiderFootDb:
             self.dbh.execute("PRAGMA foreign_keys = ON")
             self.dbh.execute("PRAGMA temp_store = MEMORY")
             self.dbh.execute("PRAGMA cache_size = 800")
-            
+
         self.conn.text_factory = str
 
         if init:
@@ -530,7 +537,11 @@ class SpiderFootDb:
         """Create the database schema."""
         try:
             with self.dbhLock:
-                queries = self.createSchemaQueriesSQLite if self.db_type == "SQLITE" else self.createSchemaQueriesPostgreSQL
+                queries = (
+                    self.createSchemaQueriesSQLite
+                    if self.db_type == "SQLITE"
+                    else self.createSchemaQueriesPostgreSQL
+                )
                 for query in queries:
                     try:
                         if not query.strip():
@@ -539,7 +550,9 @@ class SpiderFootDb:
                     except Exception as e:
                         # If the error is because the table already exists, we can ignore it
                         if "already exists" not in str(e).lower():
-                            self.log.error(f"Error creating schema with query {query}: {e}")
+                            self.log.error(
+                                f"Error creating schema with query {query}: {e}"
+                            )
                             raise
                 self.conn.commit()
                 self.log.info("Database schema created successfully")
@@ -549,7 +562,7 @@ class SpiderFootDb:
 
     def vacuumDB(self) -> bool:
         """Vacuum the database.
-        
+
         Returns:
             bool: success
         """

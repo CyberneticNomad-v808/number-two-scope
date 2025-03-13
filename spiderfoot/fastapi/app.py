@@ -78,7 +78,7 @@ def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI
     # Add application startup and shutdown events
     try:
         app = FastAPI(title="SpiderFoot API")
-        
+
         # Register exception handler to catch and log startup errors
         @app.on_event("startup")
         async def startup_event():

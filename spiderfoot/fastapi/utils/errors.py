@@ -3,19 +3,22 @@ from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional, List, Type
 from pydantic import BaseModel
 
+
 class ErrorDetail(BaseModel):
     """Model representing an error detail."""
     message: str
     code: Optional[str] = None
     params: Optional[Dict[str, Any]] = None
 
+
 class ErrorResponse(BaseModel):
     """Model representing the error response."""
     detail: ErrorDetail
     status_code: int
 
+
 def create_error_response(
-    message: str, 
+    message: str,
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
     code: Optional[str] = None,
     params: Optional[Dict[str, Any]] = None
@@ -32,8 +35,10 @@ def create_error_response(
         JSONResponse with the error details
     """
     error_detail = ErrorDetail(message=message, code=code, params=params)
-    content = ErrorResponse(detail=error_detail, status_code=status_code).dict()
+    content = ErrorResponse(detail=error_detail,
+                            status_code=status_code).dict()
     return JSONResponse(content=content, status_code=status_code)
+
 
 def setup_error_handlers(app: FastAPI) -> None:
     """Setup global exception handlers for the FastAPI application.
@@ -49,7 +54,7 @@ def setup_error_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code="internal_server_error"
         )
-    
+
     @app.exception_handler(status.HTTP_404_NOT_FOUND)
     async def not_found_handler(request: Request, exc: Exception) -> JSONResponse:
         """Handle 404 Not Found errors."""

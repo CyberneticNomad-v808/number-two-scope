@@ -21,9 +21,12 @@ from fastapi import FastAPI
 app = FastAPI(title="SpiderFoot")
 
 # This is the main entry point that's being imported
+
+
 def main():
     """Entry point for FastAPI web server."""
     return app
+
 
 @app.get("/")
 async def root():

@@ -91,7 +91,7 @@ def main():
         loggingQueue = mp.Queue()
         logListenerSetup(loggingQueue, sfConfig)
         logWorkerSetup(loggingQueue)
-        
+
         sf = SpiderFoot(sfConfig)
         modlist = sf.modulesProducing("")
         modules = dict()

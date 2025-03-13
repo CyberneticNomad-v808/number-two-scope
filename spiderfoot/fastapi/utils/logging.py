@@ -20,7 +20,7 @@ from spiderfoot import SpiderFootDb, SpiderFootHelpers
 
 class JSONLogFormatter(logging.Formatter):
     """JSON formatter for structured logging."""
-    
+
     def format(self, record):
         log_record = {
             "timestamp": self.formatTime(record),
@@ -28,20 +28,20 @@ class JSONLogFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        
+
         # Add exception info if available
         if record.exc_info:
             log_record["exception"] = self.formatException(record.exc_info)
-            
+
         # Add extra attributes from record
         for key, value in record.__dict__.items():
-            if key not in ["args", "exc_info", "exc_text", "msg", "message", 
-                           "levelname", "levelno", "pathname", "filename", 
-                           "module", "name", "lineno", "funcName", "created", 
-                           "asctime", "msecs", "relativeCreated", "thread", 
+            if key not in ["args", "exc_info", "exc_text", "msg", "message",
+                           "levelname", "levelno", "pathname", "filename",
+                           "module", "name", "lineno", "funcName", "created",
+                           "asctime", "msecs", "relativeCreated", "thread",
                            "threadName", "processName", "process"]:
                 log_record[key] = value
-                
+
         import json
         return json.dumps(log_record)
 
@@ -215,27 +215,27 @@ class SpiderFootLogger:
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Middleware for logging HTTP requests processed by the application."""
-    
+
     def __init__(self, app, logger=None):
         super().__init__(app)
         self.logger = logger
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
-        
+
         # Process the request
         response = await call_next(request)
-        
+
         # Calculate request processing time
         process_time = (time.time() - start_time) * 1000
-        
+
         # Log request details
         if self.logger:
             self.logger.info(
                 f"{request.method} {request.url.path} "
                 f"completed in {process_time:.2f}ms - Status: {response.status_code}"
             )
-            
+
         return response
 
 

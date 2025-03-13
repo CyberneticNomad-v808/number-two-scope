@@ -33,9 +33,9 @@ warnings.warn(
 # Re-export all symbols from the new module
 __all__ = [
     "SafeQueueListener",
-    "SpiderFootSqliteLogHandler", 
+    "SpiderFootSqliteLogHandler",
     "SpiderFootLogger",
-    "logListenerSetup", 
+    "logListenerSetup",
     "logWorkerSetup",
     "stop_listener",
     "logEvent",

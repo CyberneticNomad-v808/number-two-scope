@@ -1663,12 +1663,12 @@ if __name__ == "__main__":
     parser.add_argument("--api-key-auth", action="store_true", default=False, dest="api_key_auth",
                         help="Enable API key authentication")
     parser.add_argument("--api-key", default=None, dest="api_key",
-                      help="Specify API key for authentication (generated if not provided)")
+                        help="Specify API key for authentication (generated if not provided)")
     parser.add_argument("--dbpath", default=None, dest="dbpath",
-                      help="Path to SpiderFoot database file")
-                      
+                        help="Path to SpiderFoot database file")
+
     args = parser.parse_args()
-    
+
     # Determine database path - if not provided, use a directory in the user's home
     if args.dbpath:
         db_path = args.dbpath
@@ -1685,9 +1685,9 @@ if __name__ == "__main__":
                 print(f"Failed to create SpiderFoot directory: {e}")
                 exit(1)
         db_path = os.path.join(sf_dir, "spiderfoot.db")
-    
+
     print(f"Using database: {db_path}")
-    
+
     # Initialize with default configuration
     defaultConfig = {
         '__database': db_path,      # Set default database path
@@ -1705,7 +1705,7 @@ if __name__ == "__main__":
         print(f"Database initialization error: {e}")
         print("Using default configuration instead.")
         config = defaultConfig
-    
+
     # Set up web interface configuration
     web_config = {
         "host": args.listen,

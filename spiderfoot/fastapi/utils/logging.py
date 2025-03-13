@@ -2,9 +2,8 @@ import logging
 from typing import Dict, Any
 
 def setup_logging(config: Dict[str, Any] = None) -> None:
-    """
-    Configure logging for the FastAPI application
-    
+    """Configure logging for the FastAPI application.
+
     Args:
         config: Dictionary containing logging configuration
     """
@@ -20,12 +19,11 @@ def setup_logging(config: Dict[str, Any] = None) -> None:
     )
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get a logger instance with the specified name
-    
+    """Get a logger instance with the specified name.
+
     Args:
         name: Name for the logger
-        
+
     Returns:
         logging.Logger: Logger instance
     """

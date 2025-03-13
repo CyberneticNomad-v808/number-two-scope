@@ -33,6 +33,5 @@ warnings.warn(
 )
 
 # Re-export from the new module structure
-
-__all__ = ["setup_logging", "get_logger",
+__all__ = ["setup_logging", "get_logger", 
            "LoggingMiddleware", "JSONLogFormatter"]

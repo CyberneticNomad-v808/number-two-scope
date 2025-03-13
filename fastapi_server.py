@@ -23,4 +23,3 @@ async def server_info() -> Dict[str, str]:
 if __name__ == "__main__":
     print("Starting FastAPI web server at http://0.0.0.0:5001/")
     uvicorn.run(app, host="0.0.0.0", port=5001)
-```

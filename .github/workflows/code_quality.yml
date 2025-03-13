@@ -50,16 +50,19 @@ jobs:
 
       - name: Install docformatter, black, and autopep8
         run: |
-          pip install docformatter
-          pip install black
           pip install autopep8
-
-      - name: Run black
-        run: black .
 
       - name: Run autopep8
         run: autopep8 --in-place --recursive .
 
+      - name: Commit changes
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add -A
+          git commit -m "Auto-format docstrings with docformatter" || echo "No changes to commit"
+          git push
+  
   docformatter:
     runs-on: ubuntu-latest
     permissions:
@@ -85,16 +88,11 @@ jobs:
       id: check-formatting
       continue-on-error: true
       run: |
-        docformatter --check --recursive spiderfoot/ test/ sf.py sfcli.py sfscan.py sfapi.py
+        docformatter --in-place --recursive .
         echo "HAS_ISSUES=$?" >> $GITHUB_ENV
         
-    - name: Auto-fix docstring formatting
-      if: env.HAS_ISSUES == '1' && github.event_name == 'push'
-      run: |
-        docformatter --in-place --recursive spiderfoot/ test/ sf.py sfcli.py sfscan.py sfapi.py
-        
+       
     - name: Commit changes
-      if: env.HAS_ISSUES == '1' && github.event_name == 'push'
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@github.com'

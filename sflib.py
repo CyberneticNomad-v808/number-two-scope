@@ -56,6 +56,31 @@ class SpiderFoot:
     _socksProxy = None
     opts = dict()
 
+    @staticmethod
+    def defaultConfig() -> dict:
+        """Return the default configuration for SpiderFoot.
+        
+        Returns:
+            dict: default configuration
+        """
+        config = {
+            '_debug': False,  # Debug
+            '__logging': True,  # Logging in general
+            '__outputfilter': None,  # Event types to filter from modules' output
+            '__blocknotif': False,  # Block notifications
+            '_fatalerrors': False,  # Abort on fatal errors
+            '_useragent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0',  # User-agent for HTTP requests
+            '_dnsserver': '',  # Override the default resolver
+            '_fetchtimeout': 30,  # Number of seconds before giving up on a fetch
+            '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',  # List of Internet TLDs
+            '_internettlds_cache': 72,  # Hours to cache the Internet TLDs list
+            '_genericusers': "abuse,admin,billing,compliance,devnull,dns,ftp,hostmaster,inoc,ispfeedback,ispsupport,list-request,list,maildaemon,marketing,noc,no-reply,noreply,null,peering,peering-notify,peering-request,phish,phishing,postmaster,privacy,registrar,registry,root,routing-registry,rr,sales,security,spam,support,sysadmin,tech,undisclosed-recipients,unsubscribe,usenet,uucp,webmaster,www",
+            '__version__': '3.0',
+            '__database': 'spiderfoot.db',
+        }
+        
+        return config
+
     def __init__(self, options: dict) -> None:
         """Initialize SpiderFoot object.
 

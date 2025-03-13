@@ -4,11 +4,11 @@
 from .db import SpiderFootDb
 from .event import SpiderFootEvent
 from .helpers import SpiderFootHelpers
-
+from .threadpool import SpiderFootThreadPool
 # Now we can safely import the plugin module
 from .plugin import SpiderFootPlugin
 from .logger import logListenerSetup, logWorkerSetup
-from spiderfoot.version import __version__  # noqa
+from spiderfoot.__version__ import __version__  # noqa
 
 # Expose these classes/functions at the package level
 # but import them in functions where needed

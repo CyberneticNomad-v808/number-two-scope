@@ -58,7 +58,8 @@ def main():
     args = parser.parse_args()
 
     # Load the default configuration from the config file
-    sfConfig = SpiderFoot.defaultConfig()
+    sf = SpiderFoot()
+    sfConfig = sf.defaultConfig()
     sfConfig['_debug'] = args.debug
 
     if args.r:

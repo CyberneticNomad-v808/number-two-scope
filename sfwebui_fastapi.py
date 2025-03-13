@@ -1581,7 +1581,7 @@ async def savesettings(
 
 def find_static_dir():
     """Find the correct directory containing static files.
-    
+
     Returns:
         str: Path to static files directory
     """
@@ -1697,7 +1697,7 @@ def start_cherrypy_server(web_config: dict, config: dict):
 
 def load_default_modules():
     """Load default module configuration.
-    
+
     Returns:
         dict: Default module configuration
     """

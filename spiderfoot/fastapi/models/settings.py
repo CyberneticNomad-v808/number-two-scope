@@ -10,27 +10,27 @@ from pydantic import BaseModel, Field, root_validator
 class ApiSettings(BaseModel):
     """API settings model."""
     enable_api_key_auth: bool = Field(
-        False, 
+        False,
         description="Enable API key authentication"
     )
     api_key: Optional[str] = Field(
-        None, 
+        None,
         description="API key for authentication"
     )
     show_api_key: bool = Field(
-        False, 
+        False,
         description="Show API key in logs on startup"
     )
     cors_origins: List[str] = Field(
-        ["http://localhost", "http://127.0.0.1"], 
+        ["http://localhost", "http://127.0.0.1"],
         description="CORS allowed origins"
     )
     debug: bool = Field(
-        False, 
+        False,
         description="Enable debug mode"
     )
     root: str = Field(
-        "/", 
+        "/",
         description="API root path"
     )
 
@@ -38,11 +38,11 @@ class ApiSettings(BaseModel):
 class ModuleOptions(BaseModel):
     """Model for module options."""
     enabled: bool = Field(
-        True, 
+        True,
         description="Whether the module is enabled"
     )
     options: Dict[str, Any] = Field(
-        default_factory=dict, 
+        default_factory=dict,
         description="Module-specific options"
     )
 

@@ -42,14 +42,14 @@ from spiderfoot.fastapi.utils.helpers import (
 __all__ = [
     # Security
     "generate_api_key", "setup_cors", "APIKeyAuth", "create_api_key_handler",
-    
+
     # Logging
     "setup_logging", "get_logger",
-    
+
     # Error handling
     "setup_error_handlers", "ErrorDetail",
-    
+
     # Helpers
-    "generate_unique_id", "format_timestamp", "sanitize_input", 
+    "generate_unique_id", "format_timestamp", "sanitize_input",
     "parse_comma_separated_list", "is_valid_target"
 ]

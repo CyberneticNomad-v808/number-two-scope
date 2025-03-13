@@ -22,7 +22,7 @@ MISP_OBJECT_TEMPLATES = {
             {
                 "name": "ip",
                 "type": "ip-dst",
-                "category": "Network activity", 
+                "category": "Network activity",
                 "to_ids": True,
                 "object_relation": "ip"
             }
@@ -62,7 +62,7 @@ MISP_OBJECT_TEMPLATES = {
         "required": ["id"],
         "attributes": [
             {
-                "name": "id", 
+                "name": "id",
                 "type": "vulnerability",
                 "category": "External analysis",
                 "to_ids": False,
@@ -175,14 +175,14 @@ def create_object_from_template(object_type: str, values: Dict[str, Any]) -> Dic
     template = get_template(object_type)
     if not template:
         return {}
-    
+
     # Create a copy of the template
     obj = {
         "name": template["name"],
         "description": template["description"],
         "Attribute": []
     }
-    
+
     # Fill in the attributes
     for attr_template in template["attributes"]:
         attr_name = attr_template["name"]
@@ -195,13 +195,13 @@ def create_object_from_template(object_type: str, values: Dict[str, Any]) -> Dic
                 "value": values[attr_name]
             }
             obj["Attribute"].append(attribute)
-    
+
     # Check required attributes
     for required in template.get("required", []):
         if not any(a["object_relation"] == required for a in obj["Attribute"]):
             # Missing required attribute
             return {}
-    
+
     return obj
 
 
@@ -225,5 +225,5 @@ def map_sf_event_to_misp_object(sf_event_type: str, sf_event_data: str) -> Dict[
         "PHONE_NUMBER": {"object_type": "person", "attr_name": "phone-number"},
         "SSL_CERTIFICATE_RAW": {"object_type": "ssl-certificate", "attr_name": "x509-fingerprint-sha1"}
     }
-    
+
     return mapping.get(sf_event_type, {})

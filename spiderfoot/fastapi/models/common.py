@@ -18,7 +18,8 @@ class ErrorDetail(BaseModel):
     """Error detail model."""
     type: str = Field(description="Error type")
     message: str = Field(description="Error message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional error details")
 
 
 class ErrorResponse(BaseModel):
@@ -35,7 +36,7 @@ class StatusEnum(str, Enum):
     ABORTED = "ABORTED"
     FAILED = "FAILED"
     ABORT_REQUESTED = "ABORT-REQUESTED"
-    
+
 
 class RiskLevel(str, Enum):
     """Risk level enumeration."""

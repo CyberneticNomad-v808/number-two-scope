@@ -10,32 +10,32 @@ from pydantic import BaseModel, Field, validator
 class ScanRequest(BaseModel):
     """Model for scan request."""
     scanname: str = Field(
-        ..., 
+        ...,
         description="Name for the scan"
     )
     scantarget: str = Field(
-        ..., 
+        ...,
         description="Target for the scan"
     )
     modulelist: Optional[str] = Field(
-        None, 
+        None,
         description="Comma-separated list of modules"
     )
     typelist: Optional[str] = Field(
-        None, 
+        None,
         description="Comma-separated list of event types"
     )
     usecase: Optional[str] = Field(
-        None, 
+        None,
         description="Use case (all, passive, investigate, footprint)"
     )
-    
+
     @validator("scanname", "scantarget")
     def validate_non_empty(cls, v):
         if not v or not v.strip():
             raise ValueError("Field cannot be empty")
         return v
-    
+
     @validator("usecase")
     def validate_usecase(cls, v):
         if v and v not in ["all", "passive", "investigate", "footprint"]:
@@ -77,7 +77,7 @@ class ExportRequest(BaseModel):
         "csv",
         description="Export format (csv, json, xlsx, gexf)"
     )
-    
+
     @validator("format")
     def validate_format(cls, v):
         if v not in ["csv", "json", "xlsx", "gexf"]:

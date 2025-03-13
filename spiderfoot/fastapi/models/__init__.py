@@ -54,16 +54,16 @@ from spiderfoot.fastapi.models.requests import (
 __all__ = [
     # Common models
     "ApiResponse", "ErrorDetail", "ErrorResponse", "StatusEnum", "RiskLevel", "RiskMatrix",
-    
+
     # Scan models
     "ScanCreate", "ScanResponse", "ScanInfo", "ScanListItem", "ScanDelete",
-    
+
     # Config models
     "ConfigOptions", "ConfigResponse", "ModuleInfo", "CorrelationRule",
-    
+
     # Settings models
     "ApiSettings", "ModuleOptions", "SpiderFootConfig", "ConfigUpdateRequest", "TokenResponse",
-    
+
     # Request models
     "ScanRequest", "SearchRequest", "ExportRequest"
 ]

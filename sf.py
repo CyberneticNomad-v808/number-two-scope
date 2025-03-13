@@ -39,40 +39,46 @@ try:
 except ImportError:
     fastapi_available = False
 
+
 def main():
     # Parse command line options
-    parser = argparse.ArgumentParser(description=f'SpiderFoot {__version__}: Open Source Intelligence Automation.')
-    parser.add_argument('-d', '--debug', help='Enable debug output.', action='store_true')
-    parser.add_argument('-l', metavar='IP:port', help='IP and port to listen on.')
-    parser.add_argument('-m', metavar='mod1,mod2,...', type=str, help='Modules to enable.')
-    parser.add_argument('-M', '--modules', help='List available modules.', action='store_true')
+    parser = argparse.ArgumentParser(
+        description=f'SpiderFoot {__version__}: Open Source Intelligence Automation.')
+    parser.add_argument(
+        '-d', '--debug', help='Enable debug output.', action='store_true')
+    parser.add_argument('-l', metavar='IP:port',
+                        help='IP and port to listen on.')
+    parser.add_argument('-m', metavar='mod1,mod2,...',
+                        type=str, help='Modules to enable.')
+    parser.add_argument('-M', '--modules',
+                        help='List available modules.', action='store_true')
     parser.add_argument('-s', metavar='TARGET', help='Target for the scan.')
-    parser.add_argument('-t', metavar='type1,type2,...', type=str, help='Event types to collect.')
-    parser.add_argument('-T', '--types', help='List available event types.', action='store_true')
-    parser.add_argument('-o', metavar='tab|csv|json', type=str, help='Output format.')
+    parser.add_argument('-t', metavar='type1,type2,...',
+                        type=str, help='Event types to collect.')
+    parser.add_argument(
+        '-T', '--types', help='List available event types.', action='store_true')
+    parser.add_argument('-o', metavar='tab|csv|json',
+                        type=str, help='Output format.')
     parser.add_argument('-n', metavar='Name', help='Name for the scan.')
     parser.add_argument('-r', help='Data directory', type=str)
-    parser.add_argument('-c', '--correlate', help='Run correlation rules against scan results.', action='store_true')
+    parser.add_argument(
+        '-c', '--correlate', help='Run correlation rules against scan results.', action='store_true')
     parser.add_argument('-f', help='Disable DNS cache.', action='store_true')
-    parser.add_argument('-F', '--fastapi', help='Use FastAPI web interface instead of CherryPy.', action='store_true')
+    parser.add_argument(
+        '-F', '--fastapi', help='Use FastAPI web interface instead of CherryPy.', action='store_true')
     options = parser.parse_args()
-    
-    # Create an options dictionary for SpiderFoot
-    opts = {
-        'debug': options.debug
-    }
     
     # Load the default configuration from the config file
     sf = SpiderFoot(opts)
     sfConfig = sf.defaultConfig()
     sfConfig['_debug'] = options.debug
-    
+
     if options.r:
         if not os.path.isdir(options.r):
             print(f"Could not find data directory: {options.r}")
             sys.exit(-1)
         sfConfig['__database'] = os.path.join(options.r, "spiderfoot.db")
-    
+
     # Are we looping through a set of modules and just listing them?
     if options.modules:
         log_level = logging.DEBUG if options.debug else logging.INFO
@@ -81,7 +87,7 @@ def main():
         logListenerSetup(loggingQueue, sfConfig)
         logWorkerSetup(loggingQueue)
         
-        sf = SpiderFoot(opts)
+        sf = SpiderFoot(sfConfig)
         modlist = sf.modulesProducing("")
         modules = dict()
         for mod in modlist:
@@ -95,7 +101,7 @@ def main():
                 print(f"  {mod} - {modules[mod]['descr']}")
         print("")
         sys.exit(0)
-    
+
     # Are we looping through a set of output types and just listing them?
     if options.types:
         dbh = SpiderFootDb(sfConfig)
@@ -106,7 +112,7 @@ def main():
             print(f"  {r[1]} - {r[0]}")
         print("")
         sys.exit(0)
-    
+
     # Convert a target to a normalized form
     target_type = None
     if options.s:
@@ -114,7 +120,7 @@ def main():
         if target_type is None:
             print("Unable to determine target type. Please specify a valid target.")
             sys.exit(-1)
-    
+
     # If using the web interface, start the web server
     if options.l and not options.s:
         if ":" not in options.l:
@@ -127,7 +133,7 @@ def main():
         except Exception as e:
             print(f"Invalid ip:port format: {e}")
             sys.exit(-1)
-        
+
         # Start the web server
         web_config = {
             'host': host,
@@ -142,13 +148,14 @@ def main():
                 # Override sys.argv to pass the web server configuration
                 orig_argv = sys.argv
                 sys.argv = [sys.argv[0],
-                            '--listen', host, 
+                            '--listen', host,
                             '--port', str(port)]
                 if options.debug:
                     sys.argv.append('--debug')
                 if options.r:
-                    sys.argv.extend(['--config', os.path.join(options.r, "spiderfoot.conf")])
-                
+                    sys.argv.extend(
+                        ['--config', os.path.join(options.r, "spiderfoot.conf")])
+
                 print(f"Starting FastAPI web server at http://{host}:{port}/")
                 fastapi_main()
                 sys.argv = orig_argv  # Restore original argv
@@ -159,7 +166,7 @@ def main():
                     print("Falling back to CherryPy web server")
                 else:
                     sys.exit(-1)
-        
+
         # Fall back to CherryPy
         sfWebUiConfig = {
             'host': host,
@@ -174,14 +181,14 @@ def main():
             'log.screen': options.debug,
             'request.show_tracebacks': options.debug
         })
-        
+
         mp.set_start_method("spawn", force=True)
         loggingQueue = mp.Queue()
         logListenerSetup(loggingQueue, sfConfig)
 
         if not options.debug:
             cherrypy.log.screen = False
-        
+
         print(f"Starting web server at http://{host}:{port}/")
 
         # Initialize the web server
@@ -190,7 +197,7 @@ def main():
         # Configure and start the web server
         cherrypy.quickstart(webapp, script_name=web_config['root'])
         return
-    
+
     # We're not starting the web server, so run the command-line scanner
     if not options.s:
         print("You need to specify a target with -s.")
@@ -206,7 +213,7 @@ def main():
 
     # Define the scan ID
     scan_id = SpiderFootHelpers.genScanInstanceId()
-    
+
     # Initialize logging
     mp.set_start_method("spawn", force=True)
     loggingQueue = mp.Queue()
@@ -229,11 +236,12 @@ def main():
 
     if options.f:
         sfConfig['_dnsresolver'] = False
-    
+
     # Start the scan
     p = mp.Process(
         target=startSpiderFootScanner,
-        args=(loggingQueue, options.n, scan_id, options.s, target_type, mods, sfConfig)
+        args=(loggingQueue, options.n, scan_id,
+              options.s, target_type, mods, sfConfig)
     )
     p.daemon = True
     p.start()
@@ -241,13 +249,13 @@ def main():
 
     # Wait for the scan to complete
     print(f"Scan {scan_id} completed. Use the -l option to review results.")
-    
+
     # Correlate the results if requested
     if options.correlate:
         print("Running correlation...")
         dbh = SpiderFootDb(sfConfig)
         dbh.scanInstanceCorrelations(scan_id)
-    
+
     # Output scan results if output format specified
     if options.o:
         dbh = SpiderFootDb(sfConfig)
@@ -280,6 +288,7 @@ def main():
             print(f"Tab-separated output written to {options.n}.tsv")
         else:
             print(f"Unknown output format: {options.o}")
+
 
 if __name__ == "__main__":
     main()

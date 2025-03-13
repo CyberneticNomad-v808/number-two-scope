@@ -36,18 +36,18 @@ def create_test_client(
         "__modules__": {},
         "_debug": True,
     }
-    
+
     default_web_config = {
         'root': '/',
         'host': '127.0.0.1',
         'port': 5001,
         'debug': True,
     }
-    
+
     # Use provided configs or defaults
     test_config = config or default_config
     test_web_config = web_config or default_web_config
-    
+
     # Create a test app
     if mock_db:
         from unittest.mock import patch
@@ -69,19 +69,19 @@ def create_temp_config_file(config: Dict[str, Any]) -> str:
         Path to temporary configuration file
     """
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.conf')
-    
+
     with open(temp_file.name, 'w', encoding='utf-8') as f:
         for key, value in config.items():
             if isinstance(value, dict):
                 # Skip nested dictionaries as they need special handling
                 continue
             f.write(f"{key}={value}\n")
-    
+
     return temp_file.name
 
 
 def mock_scan_result(
-    scan_id: str, 
+    scan_id: str,
     scan_name: str = "Test Scan",
     target: str = "example.com",
     status: str = "FINISHED",
@@ -129,17 +129,17 @@ def mock_scan_history(scan_id: str, points: int = 10) -> List[List[int]]:
     """
     base_time = 1625000000
     history = []
-    
+
     for i in range(points):
         timestamp = base_time + (i * 300)  # Every 5 minutes
         events = i * 5  # Increasing number of events
         history.append([timestamp, events])
-    
+
     return history
 
 
 def mock_api_response(
-    scan_id: str, 
+    scan_id: str,
     event_count: int = 10,
     start_time: int = 1625000000
 ) -> List[List[Any]]:
@@ -154,12 +154,12 @@ def mock_api_response(
         Mock API response data
     """
     events = []
-    
+
     for i in range(event_count):
         timestamp = start_time + (i * 60)  # Every minute
         event_type = "IP_ADDRESS" if i % 3 == 0 else "DOMAIN_NAME" if i % 3 == 1 else "URL"
         module = "sfp_dnsresolve" if i % 2 == 0 else "sfp_hunter"
-        
+
         events.append([
             timestamp,
             f"data_{i}",  # Data
@@ -168,14 +168,14 @@ def mock_api_response(
             event_type,  # Event type
             f"event_id_{i}",  # Event ID
             scan_id,  # Scan ID
-            "Test scan", # Scan name
+            "Test scan",  # Scan name
             "example.com",  # Scan target
             i,  # Source event ID
             0,  # False positive
             "INFO",  # Risk
-            f"Data {i} from {module}", # Data description
+            f"Data {i} from {module}",  # Data description
             "",  # Correlation ID
             ""  # Correlation rule ID
         ])
-    
+
     return events

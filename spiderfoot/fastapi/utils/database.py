@@ -17,7 +17,7 @@ logger = get_logger("spiderfoot.api.database")
 
 class DatabaseHelper:
     """Helper class for database operations."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """Initialize database helper.
 
@@ -26,7 +26,7 @@ class DatabaseHelper:
         """
         self.config = config
         self.dbh = SpiderFootDb(config)
-    
+
     def get_scan_list(self) -> List[Dict[str, Any]]:
         """Get list of all scans.
 
@@ -72,7 +72,7 @@ class DatabaseHelper:
             )
 
         return retdata
-    
+
     def get_scan_status(self, scan_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a scan.
 
@@ -83,20 +83,20 @@ class DatabaseHelper:
             Scan status details or None if scan not found
         """
         data = self.dbh.scanInstanceGet(scan_id)
-        
+
         if not data:
             return None
-            
+
         created = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data[2]))
         started = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data[3]))
         ended = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(data[4]))
-        
+
         riskmatrix = {"HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
         correlations = self.dbh.scanCorrelationSummary(scan_id, by="risk")
         if correlations:
             for c in correlations:
                 riskmatrix[c[0]] = c[1]
-                
+
         return {
             "id": data[0],
             "name": data[1],
@@ -106,7 +106,7 @@ class DatabaseHelper:
             "status": data[5],
             "risk_matrix": riskmatrix
         }
-    
+
     def delete_scan(self, scan_id: str) -> bool:
         """Delete a scan.
 
@@ -120,9 +120,10 @@ class DatabaseHelper:
             self.dbh.scanInstanceDelete(scan_id)
             return True
         except Exception as e:
-            logger.error(f"Failed to delete scan {scan_id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to delete scan {scan_id}: {str(e)}", exc_info=True)
             return False
-    
+
     def stop_scan(self, scan_id: str) -> bool:
         """Stop a running scan.
 
@@ -136,9 +137,10 @@ class DatabaseHelper:
             self.dbh.scanInstanceSet(scan_id, status="ABORT-REQUESTED")
             return True
         except Exception as e:
-            logger.error(f"Failed to stop scan {scan_id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"Failed to stop scan {scan_id}: {str(e)}", exc_info=True)
             return False
-    
+
     def get_scan_config(self, scan_id: str) -> Dict[str, str]:
         """Get configuration for a scan.
 
@@ -149,7 +151,7 @@ class DatabaseHelper:
             Scan configuration
         """
         return self.dbh.scanConfigGet(scan_id)
-    
+
     def get_event_types(self) -> List[Tuple[str, str]]:
         """Get all event types.
 
@@ -157,7 +159,7 @@ class DatabaseHelper:
             List of event types (description, type)
         """
         return self.dbh.eventTypes()
-    
+
     def get_scan_logs(self, scan_id: str) -> List[List[Any]]:
         """Get logs for a scan.
 
@@ -168,11 +170,11 @@ class DatabaseHelper:
             List of log entries
         """
         return self.dbh.scanLogs(scan_id)
-    
+
     def get_scan_results(
-        self, 
-        scan_id: str, 
-        event_type: Optional[str] = None, 
+        self,
+        scan_id: str,
+        event_type: Optional[str] = None,
         filter_fp: bool = False
     ) -> List[List[Any]]:
         """Get results for a scan.

@@ -30,7 +30,7 @@ def generate_api_key(length: int = 32) -> str:
 
 
 def setup_cors(
-    app: FastAPI, 
+    app: FastAPI,
     allowed_origins: List[str] = ["*"],
     allowed_methods: List[str] = ["GET", "POST", "PUT", "DELETE"],
     allowed_headers: List[str] = ["*"]
@@ -54,7 +54,7 @@ def setup_cors(
 
 class APIKeyAuth:
     """API key authentication class for FastAPI."""
-    
+
     def __init__(self, api_key_name: str = "X-API-Key", api_key: Optional[str] = None):
         """Initialize API key authentication.
 
@@ -65,7 +65,7 @@ class APIKeyAuth:
         self.api_key_name = api_key_name
         self.api_key_header = APIKeyHeader(name=api_key_name, auto_error=True)
         self.api_key = api_key or generate_api_key()
-    
+
     def verify_api_key(self, api_key: str) -> bool:
         """Verify API key.
 
@@ -88,8 +88,8 @@ class APIKeyAuth:
 
 
 def create_api_key_handler(
-    app: FastAPI, 
-    api_key: Optional[str] = None, 
+    app: FastAPI,
+    api_key: Optional[str] = None,
     show_api_key: bool = False
 ) -> APIKeyAuth:
     """Create an API key handler for the FastAPI application.
@@ -103,16 +103,17 @@ def create_api_key_handler(
         APIKeyAuth instance
     """
     from spiderfoot.fastapi.dependencies import initialize_api_key_auth
-    
+
     # Generate API key if not provided
     if api_key is None:
         api_key = generate_api_key()
-    
+
     # Initialize API key auth
-    api_key_auth = initialize_api_key_auth(api_key_name="X-API-Key", api_key=api_key)
-    
+    api_key_auth = initialize_api_key_auth(
+        api_key_name="X-API-Key", api_key=api_key)
+
     # Log API key if requested
     if show_api_key:
         logger.info(f"API Key: {api_key}")
-    
+
     return api_key_auth

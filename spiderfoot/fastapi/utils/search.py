@@ -16,7 +16,7 @@ logger = get_logger("spiderfoot.api.search")
 
 class SearchHelper:
     """Helper class for search operations."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """Initialize search helper.
 
@@ -25,7 +25,7 @@ class SearchHelper:
         """
         self.config = config
         self.dbh = SpiderFootDb(config)
-    
+
     def search_by_criteria(
         self,
         scan_id: Optional[str] = None,
@@ -97,7 +97,7 @@ class SearchHelper:
             )
 
         return retdata
-    
+
     def get_scan_history(self, scan_id: str) -> List[Dict[str, Any]]:
         """Get historical data for a scan.
 
@@ -113,9 +113,10 @@ class SearchHelper:
                 {
                     "timestamp": row[0],
                     "count": row[1]
-                } 
+                }
                 for row in data
             ]
         except Exception as e:
-            logger.error(f"Error getting scan history: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error getting scan history: {str(e)}", exc_info=True)
             return []

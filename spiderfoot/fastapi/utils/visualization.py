@@ -14,7 +14,7 @@ logger = get_logger("spiderfoot.api.visualization")
 
 class VisualizationHelper:
     """Helper class for data visualization."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """Initialize visualization helper.
 
@@ -23,10 +23,10 @@ class VisualizationHelper:
         """
         self.config = config
         self.dbh = SpiderFootDb(config)
-    
+
     def get_scan_visualization_data(
-        self, 
-        scan_id: str, 
+        self,
+        scan_id: str,
         as_gexf: bool = False
     ) -> Optional[Any]:
         """Get visualization data for a scan.
@@ -55,12 +55,13 @@ class VisualizationHelper:
             else:
                 return SpiderFootHelpers.buildGraphJson([root], data)
         except Exception as e:
-            logger.error(f"Error generating visualization data: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error generating visualization data: {str(e)}", exc_info=True)
             return None
-    
+
     def get_multi_scan_visualization_data(
-        self, 
-        scan_ids: List[str], 
+        self,
+        scan_ids: List[str],
         as_gexf: bool = False
     ) -> Optional[Any]:
         """Get visualization data for multiple scans.
@@ -84,7 +85,7 @@ class VisualizationHelper:
                 scan = self.dbh.scanInstanceGet(scan_id)
                 if not scan:
                     continue
-                
+
                 scan_data = self.dbh.scanResultEvent(scan_id, filterFp=True)
                 all_data.extend(scan_data)
                 roots.append(scan[1])
@@ -98,5 +99,6 @@ class VisualizationHelper:
             else:
                 return SpiderFootHelpers.buildGraphJson(roots, all_data)
         except Exception as e:
-            logger.error(f"Error generating multi-scan visualization: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error generating multi-scan visualization: {str(e)}", exc_info=True)
             return None

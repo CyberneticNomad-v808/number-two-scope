@@ -17,10 +17,10 @@ from spiderfoot import __version__
 
 class TemplateManager:
     """Template manager for SpiderFoot FastAPI implementation."""
-    
+
     def __init__(
-        self, 
-        template_dir: str = "spiderfoot/templates", 
+        self,
+        template_dir: str = "spiderfoot/templates",
         mako_dirs: Optional[List[str]] = None
     ):
         """Initialize template manager.
@@ -31,11 +31,11 @@ class TemplateManager:
         """
         self.jinja2_templates = Jinja2Templates(directory=template_dir)
         self.mako_lookup = TemplateLookup(directories=mako_dirs or [""])
-    
+
     def render_jinja2(
-        self, 
-        request: Request, 
-        template_name: str, 
+        self,
+        request: Request,
+        template_name: str,
         context: Dict[str, Any] = None
     ) -> HTMLResponse:
         """Render a Jinja2 template.
@@ -54,10 +54,10 @@ class TemplateManager:
             "version": __version__
         })
         return self.jinja2_templates.TemplateResponse(template_name, context)
-    
+
     def render_mako(
-        self, 
-        template_name: str, 
+        self,
+        template_name: str,
         context: Dict[str, Any] = None
     ) -> HTMLResponse:
         """Render a Mako template.
@@ -73,10 +73,10 @@ class TemplateManager:
         context.update({
             "version": __version__
         })
-        
+
         templ = Template(filename=template_name, lookup=self.mako_lookup)
         return HTMLResponse(content=templ.render(**context))
-    
+
     def render_error(self, message: str, docroot: str = "/") -> HTMLResponse:
         """Render error template.
 
@@ -88,7 +88,7 @@ class TemplateManager:
             HTMLResponse: Rendered error template
         """
         templ = Template(
-            filename="spiderfoot/templates/error.tmpl", 
+            filename="spiderfoot/templates/error.tmpl",
             lookup=self.mako_lookup
         )
         return HTMLResponse(

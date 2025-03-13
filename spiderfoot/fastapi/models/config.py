@@ -23,12 +23,18 @@ class ModuleInfo(BaseModel):
     """Model for module information."""
     name: str = Field(..., description="Module name")
     descr: str = Field(..., description="Module description")
-    groups: List[str] = Field(default_factory=list, description="Module groups")
-    categories: List[str] = Field(default_factory=list, description="Module categories")
-    provides: List[str] = Field(default_factory=list, description="Event types provided")
-    consumes: List[str] = Field(default_factory=list, description="Event types consumed")
-    meta: Dict[str, Any] = Field(default_factory=dict, description="Module metadata")
-    options: Dict[str, Any] = Field(default_factory=dict, description="Module options")
+    groups: List[str] = Field(default_factory=list,
+                              description="Module groups")
+    categories: List[str] = Field(
+        default_factory=list, description="Module categories")
+    provides: List[str] = Field(
+        default_factory=list, description="Event types provided")
+    consumes: List[str] = Field(
+        default_factory=list, description="Event types consumed")
+    meta: Dict[str, Any] = Field(
+        default_factory=dict, description="Module metadata")
+    options: Dict[str, Any] = Field(
+        default_factory=dict, description="Module options")
 
 
 class CorrelationRule(BaseModel):

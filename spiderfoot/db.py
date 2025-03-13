@@ -250,7 +250,7 @@ class SpiderFootDb:
         "CREATE INDEX IF NOT EXISTS idx_misp_objects ON tbl_misp_objects (scan_instance_id)",
         "CREATE INDEX IF NOT EXISTS idx_misp_attributes ON tbl_misp_attributes (scan_instance_id, object_id)"
     ]
-    
+
     # Same tables for PostgreSQL
     misp_schema_PostgreSQL = [
         "CREATE TABLE IF NOT EXISTS tbl_misp_taxonomies ( \
@@ -670,7 +670,7 @@ class SpiderFootDb:
                     if self.db_type == "SQLITE"
                     else self.createSchemaQueriesPostgreSQL
                 )
-                
+
                 # Add MISP schema queries
                 misp_queries = (
                     self.misp_schema_SQLite
@@ -678,7 +678,7 @@ class SpiderFootDb:
                     else self.misp_schema_PostgreSQL
                 )
                 queries = queries + misp_queries
-                
+
                 for query in queries:
                     try:
                         if not query.strip():
@@ -2359,24 +2359,26 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         if not isinstance(instanceId, str):
-            raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
-            
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()")
+
         if not isinstance(resultHash, str):
-            raise TypeError(f"resultHash is {type(resultHash)}; expected str()")
-            
+            raise TypeError(
+                f"resultHash is {type(resultHash)}; expected str()")
+
         if not isinstance(tag, str):
             raise TypeError(f"tag is {type(tag)}; expected str()")
-            
+
         qry = "INSERT OR IGNORE INTO tbl_scan_results_tags \
                 (scan_instance_id, result_hash, tag) \
                 VALUES (?, ?, ?)"
-                
+
         if self.db_type == "POSTGRESQL":
             qry = qry.replace("INSERT OR IGNORE", "INSERT")
             qry += " ON CONFLICT DO NOTHING"
-                
+
         qvars = [instanceId, resultHash, tag]
-        
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
@@ -2401,16 +2403,18 @@ class SpiderFootDb:
             IOError: database I/O failed
         """
         if not isinstance(instanceId, str):
-            raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
-            
+            raise TypeError(
+                f"instanceId is {type(instanceId)}; expected str()")
+
         if not isinstance(resultHash, str):
-            raise TypeError(f"resultHash is {type(resultHash)}; expected str()")
-            
+            raise TypeError(
+                f"resultHash is {type(resultHash)}; expected str()")
+
         qry = "SELECT tag FROM tbl_scan_results_tags \
                 WHERE scan_instance_id = ? AND result_hash = ?"
-                
+
         qvars = [instanceId, resultHash]
-        
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
@@ -2418,7 +2422,7 @@ class SpiderFootDb:
             except Exception as e:
                 self.log.error(f"Error getting tags: {e}")
                 return []
-                
+
     def taxonomyCreate(self, namespace: str, description: str = None) -> int:
         """Create a MISP taxonomy.
 
@@ -2435,15 +2439,15 @@ class SpiderFootDb:
         """
         if not isinstance(namespace, str):
             raise TypeError(f"namespace is {type(namespace)}; expected str()")
-            
+
         qry = "INSERT INTO tbl_misp_taxonomies (namespace, description) VALUES (?, ?)"
         qvars = [namespace, description]
-        
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
-                
+
                 # Get the ID of the new taxonomy
                 if self.db_type == "SQLITE":
                     return self.dbh.lastrowid
@@ -2453,7 +2457,7 @@ class SpiderFootDb:
             except Exception as e:
                 self.log.error(f"Error creating taxonomy: {e}")
                 return -1
-    
+
     def storeObject(self, mispObject, linkEvents: bool = True) -> bool:
         """Store a MISP object in the database.
 
@@ -2465,20 +2469,21 @@ class SpiderFootDb:
             bool: Success
         """
         from spiderfoot.misp_integration import MispObject
-        
+
         if not isinstance(mispObject, MispObject):
-            self.log.error(f"mispObject is {type(mispObject)}; expected MispObject()")
+            self.log.error(
+                f"mispObject is {type(mispObject)}; expected MispObject()")
             return False
-            
+
         # Store the object
         qry = "INSERT INTO tbl_misp_objects \
                 (id, scan_instance_id, name, description, template_uuid, \
                 template_version, meta, timestamp, distribution, sharing_group_id) \
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                
+
         objData = mispObject.to_dict()
         qvars = [
-            mispObject.uuid, 
+            mispObject.uuid,
             objData.get('scan_instance_id', ''),
             mispObject.name,
             mispObject.description,
@@ -2489,19 +2494,19 @@ class SpiderFootDb:
             mispObject.distribution,
             mispObject.sharing_group_id
         ]
-        
+
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)
                 self.conn.commit()
-                
+
                 # Store attributes
                 for attr in mispObject.attributes:
                     qry = "INSERT INTO tbl_misp_attributes \
                            (id, scan_instance_id, object_id, type, category, value, \
                            to_ids, comment, distribution, sharing_group_id, timestamp, result_hash) \
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                           
+
                     attrData = attr.to_dict()
                     qvars = [
                         attr.uuid,
@@ -2517,9 +2522,9 @@ class SpiderFootDb:
                         attr.timestamp,
                         attrData.get('result_hash', None)
                     ]
-                    
+
                     self.dbh.execute(qry, qvars)
-                
+
                 self.conn.commit()
                 return True
             except Exception as e:

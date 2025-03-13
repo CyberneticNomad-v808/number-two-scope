@@ -25,10 +25,10 @@ routers = [
 ]
 
 __all__ = [
-    "scan", 
-    "search", 
-    "config", 
-    "ui", 
+    "scan",
+    "search",
+    "config",
+    "ui",
     "export",
     "routers"
 ]

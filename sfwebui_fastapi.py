@@ -1665,11 +1665,18 @@ if __name__ == "__main__":
                       
     args = parser.parse_args()
     
-    # Load SpiderFoot configuration
-    sf = SpiderFoot({})
-    config = dict()
-    dbh = SpiderFootDb(config)
-    config = sf.configUnserialize(dbh.configGet(), dict())
+    # Initialize with default configuration
+    defaultConfig = {
+        '__database': 'spiderfoot.db',  # Set default database path
+        '_debug': args.debug,           # Pass debug flag to configuration
+    }
+    
+    # Initialize SpiderFoot with default config
+    sf = SpiderFoot(defaultConfig)
+    
+    # Now get configuration from database
+    dbh = SpiderFootDb(defaultConfig)
+    config = sf.configUnserialize(dbh.configGet(), defaultConfig)
     
     # Set up web interface configuration
     web_config = {

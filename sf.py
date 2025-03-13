@@ -1,571 +1,282 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# -------------------------------------------------------------------------------
+# -----------------------------------------------------------------
 # Name:         sf
-# Purpose:      Main wrapper for calling all SpiderFoot modules
+# Purpose:      Main SpiderFoot driver
 #
 # Author:      Steve Micallef <steve@binarypool.com>
 #
 # Created:     03/04/2012
 # Copyright:   (c) Steve Micallef 2012
-# Licence:     MIT
-# -------------------------------------------------------------------------------
+# License:     MIT
+# -----------------------------------------------------------------
 
+import os
+import sys
 import argparse
+from collections import OrderedDict
 import cherrypy
 import logging
-import multiprocessing as mp
-import os
-import signal
-import sys
-from copy import deepcopy
-from cherrypy.lib import auth_digest
-from typing import Any, Dict, List, Optional, Union
 
+# To support both command-line access and web interface
 from sflib import SpiderFoot
 from sfscan import startSpiderFootScanner
 from sfwebui import SpiderFootWebUi
-from spiderfoot import (
-    SpiderFootHelpers,
-    SpiderFootDb,
-    SpiderFootCorrelator,
-    SpiderFootTarget,
-)
-from spiderfoot.logconfig import (
-    configure_root_logger,
-    get_module_logger,
-    get_log_paths,
-    setup_file_logging,
-)
-from spiderfoot.error_handling import (
-    handle_exception,
-    SpiderFootError,
-    SpiderFootConfigError,
-)
+from spiderfoot import SpiderFootDb, SpiderFootHelpers
 from spiderfoot import __version__
-
-# Get main application logger
-log = get_module_logger("sf")
-
-# 'Global' configuration options
-# These can be overriden on a per-module basis, and some will
-# be overridden from saved configuration settings stored in the DB.
-sfConfig = {
-    "_debug": False,  # Debug
-    "_maxthreads": 3,  # Number of modules to run concurrently
-    "__logging": True,  # Logging in general
-    "__outputfilter": None,  # Event types to filter from modules' output
-    # User-Agent to use for HTTP requests
-    "_useragent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0",
-    "_dnsserver": "",  # Override the default resolver
-    "_fetchtimeout": 5,  # number of seconds before giving up on a fetch
-    "_internettlds": "https://publicsuffix.org/list/effective_tld_names.dat",
-    "_internettlds_cache": 72,
-    "_genericusers": ",".join(
-        SpiderFootHelpers.usernamesFromWordlists(["generic-usernames"])
-    ),
-    "__database": f"{SpiderFootHelpers.dataPath()}/spiderfoot.db",
-    "__modules__": None,  # List of modules. Will be set after start-up.
-    # List of correlation rules. Will be set after start-up.
-    "__correlationrules__": None,
-    "_socks1type": "",
-    "_socks2addr": "",
-    "_socks3port": "",
-    "_socks4user": "",
-    "_socks5pwd": "",
-}
-
-sfOptdescs = {
-    "_debug": "Enable debugging?",
-    "_maxthreads": "Max number of modules to run concurrently",
-    "_useragent": "User-Agent string to use for HTTP requests. Prefix with an '@' to randomly select the User Agent from a file containing user agent strings for each request, e.g. @C:\\useragents.txt or @/home/bob/useragents.txt. Or supply a URL to load the list from there.",
-    "_dnsserver": "Override the default resolver with another DNS server. For example, 8.8.8.8 is Google's open DNS server.",
-    "_fetchtimeout": "Number of seconds before giving up on a HTTP request.",
-    "_internettlds": "List of Internet TLDs.",
-    "_internettlds_cache": "Hours to cache the Internet TLD list. This can safely be quite a long time given that the list doesn't change too often.",
-    "_genericusers": "List of usernames that if found as usernames or as part of e-mail addresses, should be treated differently to non-generics.",
-    "_socks1type": "SOCKS Server Type. Can be '4', '5', 'HTTP' or 'TOR'",
-    "_socks2addr": "SOCKS Server IP Address.",
-    "_socks3port": "SOCKS Server TCP Port. Usually 1080 for 4/5, 8080 for HTTP and 9050 for TOR.",
-    "_socks4user": "SOCKS Username. Valid only for SOCKS4 and SOCKS5 servers.",
-    "_socks5pwd": "SOCKS Password. Valid only for SOCKS5 servers.",
-    # This is a hack to get a description for an option not actually available.
-    "_modulesenabled": "Modules enabled for the scan.",
-}
-
-
-def main() -> None:
-    """Main program entry point."""
-    args = parse_args()
-
-    try:
-        # Configure logging based on debug flag
-        configure_root_logger(debug=args.debug)
-
-        # Set up file logging if needed
-        log_paths = get_log_paths()
-        setup_file_logging(log_paths["debug"], level=logging.DEBUG)
-
-        # Initialize multiprocessing logging queue
-        loggingQueue = mp.Queue()
-
-        if args.debug:
-            sfConfig["_debug"] = True
-            log.info("Debug enabled")
-
-        # Load modules
-        if not load_modules(sfConfig):
-            return
-
-        # Start a scan
-        if args.start:
-            start_scan(sfConfig, args, loggingQueue)
-            return
-
-        # Start the web server
-        if args.nowebserver:
-            log.info("Web server disabled.")
-            return
-
-        # Prompt for input if we're not starting a scan
-        if not args.start and not args.nowebserver:
-            start_web_server(sfConfig, loggingQueue=loggingQueue)
-
-    except KeyboardInterrupt:
-        log.info("Interrupted by user.")
-    except SpiderFootError as e:
-        handle_exception(e, "sf", fatal=True)
-    except Exception as e:
-        handle_exception(e, "sf", fatal=True)
-
-
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="SpiderFoot: Open Source Intelligence Automation."
-    )
-    parser.add_argument(
-        "-d", "--debug", action="store_true", help="Enable debug output."
-    )
-    parser.add_argument("-l", help="Log directory.", metavar="DIR", type=str)
-    parser.add_argument(
-        "-m", "--modules", help="Comma-separated list of modules to enable.", type=str
-    )
-    parser.add_argument("-M", "--module-info",
-                        help="Get module information.", type=str)
-    parser.add_argument("-s", "--start", help="Target for the scan.", type=str)
-    parser.add_argument(
-        "-t", "--types", help="Types of scan to run.", type=str)
-    parser.add_argument("-u", "--usecase", help="Use case to run.", type=str)
-    parser.add_argument("-T", "--template",
-                        help="Scan template to use.", type=str)
-    parser.add_argument("-n", "--name", help="Name of the scan.", type=str)
-    parser.add_argument("-o", "--output", help="Output format.", type=str)
-    parser.add_argument(
-        "-f", "--filter", help="Event types to filter out.", type=str)
-    parser.add_argument(
-        "-F",
-        "--filtering",
-        help="Build filter rules from previously run scans.",
-        type=str,
-    )
-    parser.add_argument(
-        "-x", "--noproxy", action="store_true", help="Disable proxy.", default=False
-    )
-    parser.add_argument(
-        "-S", "--suppress", action="store_true", help="Silent output.", default=False
-    )
-    parser.add_argument(
-        "-D", "--delete", action="store_true", help="Delete the scan.", default=False
-    )
-    parser.add_argument("-r", "--remote", help="Remote scan ID.", type=str)
-    parser.add_argument(
-        "-H",
-        "--headers",
-        action="store_true",
-        help="Include headers in output.",
-        default=False,
-    )
-    parser.add_argument("-v", "--version",
-                        action="store_true", help="Display Version")
-    parser.add_argument(
-        "-nowebserver", action="store_true", help="Do not start the web server"
-    )
-
-    return parser.parse_args()
-
-
-def load_modules(config: dict) -> bool:
-    """Load SpiderFoot modules.
-
-    Args:
-        config: SpiderFoot configuration options
-
-    Returns:
-        bool: Success or failure
-    """
-    try:
-        # Import here to avoid circular imports
-        from spiderfoot import SpiderFootHelpers
-
-        modDir = os.path.dirname(os.path.abspath(__file__)) + "/modules/"
-
-        if not os.path.isdir(modDir):
-            log.error(f"Modules directory does not exist: {modDir}")
-            return False
-
-        modules = SpiderFootHelpers.loadModulesAsDict(modDir)
-        if not modules:
-            log.error("No modules found in modules directory.")
-            return False
-
-        log.info(f"Found {len(modules)} modules")
-        config["__modules__"] = modules
-
-        # Load correlation rules
-        corr_dir = os.path.dirname(
-            os.path.abspath(__file__)) + "/correlations/"
-        if os.path.isdir(corr_dir):
-            rules = SpiderFootHelpers.loadCorrelationRulesRaw(corr_dir)
-            config["__correlationrules__"] = rules
-            log.info(f"Loaded {len(rules)} correlation rules")
-
-        return True
-
-    except Exception as e:
-        log.error(f"Failed to load modules: {e}")
-        return False
-
-
-def start_scan(config: dict, args, loggingQueue: mp.Queue) -> None:
-    """Start a scan based on the provided configuration and command-line arguments.
-
-    Args:
-        config: SpiderFoot config options
-        args: command line args
-        loggingQueue: main SpiderFoot logging queue
-    """
-    try:
-        # Validate arguments
-        if not validate_scan_arguments(args):
-            return
-
-        target = process_target(args.start)
-        if not target:
-            log.error("Invalid target specified.")
-            return
-
-        # Initialize database
-        dbh = SpiderFootDb(config)
-
-        # Create a new scan
-        scanName = args.name if args.name else target
-        scanId = SpiderFootHelpers.genScanInstanceId()
-        targetType = SpiderFootHelpers.targetTypeFromString(target)
-
-        log.info(
-            f"Starting scan '{scanName}' (ID: {scanId}) for target '{target}'")
-
-        # Set up modules
-        modlist = prepare_modules(args, dbh, config, targetType)
-        if not modlist:
-            log.error("No modules selected for scan.")
-            return
-
-        # Prepare output configuration
-        prepare_scan_output(args)
-
-        # Execute the scan
-        startSpiderFootScanner(
-            loggingQueue, scanName, scanId, target, targetType, modlist, config
-        )
-
-    except Exception as e:
-        handle_exception(e, "start_scan")
-
-
-def validate_scan_arguments(args) -> bool:
-    """Validate scan arguments.
-
-    Args:
-        args: Command line arguments
-
-    Returns:
-        bool: True if arguments are valid
-    """
-    if not args.start:
-        log.error("No target specified.")
-        return False
-
-    if args.x and not args.t:
-        log.error("You cannot use -x without -t. Use -h for help.")
-        return False
-
-    if args.x and args.m:
-        log.error("You cannot use -x with -m. Use -h for help.")
-        return False
-
-    if args.r and (args.o and args.o not in ["tab", "csv"]):
-        log.error(
-            "Remote fetching is only compatible with tab and csv output formats.")
-        return False
-
-    if args.H and (args.o and args.o not in ["tab", "csv"]):
-        log.error("Headers are only compatible with tab and csv output formats.")
-        return False
-
-    if args.D and args.o != "csv":
-        log.error("-D can only be used when the output format is CSV (-o csv).")
-        return False
-
-    return True
-
-
-def process_target(target: str) -> str:
-    """Process and validate the scan target.
-
-    Args:
-        target: Target string
-
-    Returns:
-        str: Processed target
-    """
-    # Usernames and names - quoted on the commandline - won't have quotes,
-    # so add them.
-    if " " in target:
-        target = f'"{target}"'
-
-    if "." not in target and not target.startswith("+") and '"' not in target:
-        target = f'"{target}"'
-
-    targetType = SpiderFootHelpers.targetTypeFromString(target)
-    if not targetType:
-        log.error(
-            f"Invalid target '{target}'. Could not determine target type.")
-        return ""
-
-    target = target.strip('"')
-    return target
-
-
-def prepare_modules(args, dbh, config: dict, targetType: str) -> List[str]:
-    """Prepare module list for scanning.
-
-    Args:
-        args: Command line arguments
-        dbh: Database handle
-        config: SpiderFoot config
-        targetType: Target type
-
-    Returns:
-        list: List of modules to use
-    """
-    modlist: List[str] = []
-
-    # If no modules or types specified, use all
-    if not args.t and not args.m and not args.u:
-        log.info("No modules or types specified, using all modules.")
-        for module in sorted(config["__modules__"]):
-            if module.startswith("sfp__"):
-                modlist.append(module)
-
-        return modlist
-
-    # Register signal handler for CTRL-C
-    signal.signal(signal.SIGINT, handle_abort)
-
-    # If the user is scanning by type..
-    if args.t:
-        types = args.t.split(",")
-        for module in sorted(config["__modules__"]):
-            if module.startswith("sfp_"):
-                for mtype in config["__modules__"][module]["provides"]:
-                    if mtype.lower() in [t.lower() for t in types]:
-                        modlist.append(module)
-                        break
-
-    # If the user is scanning by module..
-    if args.m:
-        modules = args.m.split(",")
-        for module in sorted(config["__modules__"]):
-            if module.startswith("sfp_") and module in modules:
-                modlist.append(module)
-
-    # If the user is scanning by use case
-    if args.u:
-        usecase = args.u.lower()
-        for module in sorted(config["__modules__"]):
-            if not module.startswith("sfp_"):
-                continue
-
-            if usecase == "all":
-                modlist.append(module)
-                continue
-
-            if (
-                usecase == "passive" and
-                "passive" in config["__modules__"][module]["flags"]
-            ):
-                modlist.append(module)
-                continue
-
-            if (
-                usecase == "investigate" and
-                "investigate" in config["__modules__"][module]["flags"]
-            ):
-                modlist.append(module)
-                continue
-
-            if (
-                usecase == "footprint" and
-                "footprint" in config["__modules__"][module]["flags"]
-            ):
-                modlist.append(module)
-                continue
-
-    # Add sfp__stor_stdout to the module list
-    typedata = dbh.eventTypes()
-    types = dict()
-    for r in typedata:
-        types[r[1]] = r[0]
-
-    sfp__stor_stdout_opts = config["__modules__"]["sfp__stor_stdout"]["opts"]
-    sfp__stor_stdout_opts["_eventtypes"] = types
-
-    # Configure stdout module based on arguments
-    if args.f:
-        sfp__stor_stdout_opts["_modulefilter"] = args.f
-
-    if args.F:
-        sfp__stor_stdout_opts["_modulefilters"] = args.F
-
-    if args.o:
-        sfp__stor_stdout_opts["_format"] = args.o
-
-    if args.t:
-        sfp__stor_stdout_opts["_typefilter"] = args.t
-
-    if args.n:
-        sfp__stor_stdout_opts["_requested"] = args.n
+from spiderfoot.logger import logListenerSetup, logWorkerSetup
+
+# Now imports for the FastAPI interface
+import importlib.util
+import multiprocessing as mp
+
+# Check if FastAPI and dependencies are available
+fastapi_available = True
+try:
+    import fastapi
+    import uvicorn
+    from fastapi.staticfiles import StaticFiles
+except ImportError:
+    fastapi_available = False
+
+def main():
+    # Use explicit parser to support both CLI and web interface
+    parser = argparse.ArgumentParser(description=f'SpiderFoot {__version__}: Open Source Intelligence Automation.')
+    parser.add_argument('-d', '--debug', help='Enable debug output.', action='store_true')
+    parser.add_argument('-l', metavar='IP:port', help='IP and port to listen on.')
+    parser.add_argument('-m', metavar='mod1,mod2,...', type=str, help='Modules to enable.')
+    parser.add_argument('-M', '--modules', help='List available modules.', action='store_true')
+    parser.add_argument('-s', metavar='TARGET', help='Target for the scan.')
+    parser.add_argument('-t', metavar='type1,type2,...', type=str, help='Event types to collect.')
+    parser.add_argument('-T', '--types', help='List available event types.', action='store_true')
+    parser.add_argument('-o', metavar='tab|csv|json', type=str, help='Output format.')
+    parser.add_argument('-n', metavar='Name', help='Name for the scan.')
+    parser.add_argument('-r', help='Data directory', type=str)
+    parser.add_argument('-c', '--correlate', help='Run correlation rules against scan results.', action='store_true')
+    parser.add_argument('-f', help='Disable DNS cache.', action='store_true')
+    parser.add_argument('-F', '--fastapi', help='Use FastAPI web interface instead of CherryPy.', action='store_true')
+    args = parser.parse_args()
+
+    # Load the default configuration from the config file
+    sfConfig = SpiderFoot.defaultConfig()
+    sfConfig['_debug'] = args.debug
 
     if args.r:
-        sfp__stor_stdout_opts["_requested"] = args.r
+        if not os.path.isdir(args.r):
+            print(f"Could not find data directory: {args.r}")
+            sys.exit(-1)
+        sfConfig['__database'] = os.path.join(args.r, "spiderfoot.db")
 
-    if args.S:
-        sfp__stor_stdout_opts["_showsource"] = args.S
+    # Are we looping through a set of modules and just listing them?
+    if args.modules:
+        log_level = logging.DEBUG if args.debug else logging.INFO
+        mp.set_start_method("spawn", force=True)
+        loggingQueue = mp.Queue()
+        logListenerSetup(loggingQueue, sfConfig)
+        logWorkerSetup(loggingQueue)
 
-    if args.D:
-        sfp__stor_stdout_opts["_deleteafter"] = args.D
+        sf = SpiderFoot(sfConfig)
+        modlist = sf.modulesProducing("")
+        modules = dict()
+        for mod in modlist:
+            module_info = sf.loadModuleInfo(mod)
+            modules[mod] = module_info
 
-    if args.x:
-        sfp__stor_stdout_opts["_stripnumpy"] = True
+        print("")
+        print("Modules available:")
+        for mod in sorted(modules.keys()):
+            if mod.startswith("sfp__"):
+                print(f"  {mod} - {modules[mod]['descr']}")
 
-    modlist.append("sfp__stor_stdout")
+        print("")
+        sys.exit(0)
 
-    return list(set(modlist))  # Ensure list contains no duplicates
+    # Are we looping through a set of output types and just listing them?
+    if args.types:
+        dbh = SpiderFootDb(sfConfig)
+        types = dbh.eventTypes()
+        print("")
+        print("Types available:")
+        for r in types:
+            print(f"  {r[1]} - {r[0]}")
+        print("")
+        sys.exit(0)
 
+    # Convert a target to a normalized form
+    target_type = None
+    if args.s:
+        target_type = SpiderFootHelpers.targetTypeFromString(args.s)
+        if target_type is None:
+            print("Unable to determine target type. Please specify a valid target.")
+            sys.exit(-1)
 
-def prepare_scan_output(args):
-    """Prepare scan output based on arguments.
+    # If using the web interface, start the web server
+    if args.l and not args.s:
+        if ":" not in args.l:
+            print("Invalid ip:port format.")
+            sys.exit(-1)
 
-    Args:
-        args: Command line arguments
-    """
-    if args.o == "json":
-        print("[", end="")
-    elif not args.H:
-        # Print header if CSV or TSV output and headers are enabled
-        if args.o == "tab":
-            print("Source\tType\tData\tModule")
-        elif args.o == "csv":
-            print("Source,Type,Data,Module")
+        try:
+            (host, port) = args.l.split(":")
+            port = int(port)
+        except Exception as e:
+            print(f"Invalid ip:port format: {e}")
+            sys.exit(-1)
 
+        # Start the web server
+        web_config = {
+            'host': host,
+            'port': port,
+            'root': '/'
+        }
 
-def execute_scan(
-    loggingQueue: mp.Queue,
-    target: str,
-    targetType: str,
-    modlist: List[str],
-    config: Dict[str, Any],
-):
-    """Execute a scan with the provided parameters.
+        # Use FastAPI if available and requested
+        if args.fastapi or fastapi_available:
+            try:
+                from sfwebui_fastapi_main import main as fastapi_main
 
-    Args:
-        loggingQueue: Logging queue
-        target: Target to scan
-        targetType: Type of target
-        modlist: List of modules to use
-        config: SpiderFoot configuration
-    """
-    scanName = target
-    scanId = SpiderFootHelpers.genScanInstanceId()
+                # Override sys.argv to pass the web server configuration
+                orig_argv = sys.argv
+                sys.argv = [sys.argv[0], 
+                            '--listen', host, 
+                            '--port', str(port)]
+                if args.debug:
+                    sys.argv.append('--debug')
+                if args.r:
+                    sys.argv.extend(['--config', os.path.join(args.r, "spiderfoot.conf")])
+                
+                print(f"Starting FastAPI web server at http://{host}:{port}/")
+                fastapi_main()
+                sys.argv = orig_argv  # Restore original argv
+                return
+            except Exception as e:
+                print(f"Failed to start FastAPI web server: {e}")
+                if not args.fastapi:
+                    print("Falling back to CherryPy web server")
+                else:
+                    sys.exit(-1)
 
-    try:
-        # Start the scan
-        startSpiderFootScanner(
-            loggingQueue, scanName, scanId, target, targetType, modlist, config
-        )
-    except Exception as e:
-        handle_exception(e, "execute_scan")
+        # Fall back to CherryPy
+        sfWebUiConfig = {
+            'host': host,
+            'port': port,
+            'root': '/',
+            'cors': ['http://127.0.0.1:3000', 'http://localhost:3000']
+        }
 
+        cherrypy.config.update({
+            'server.socket_host': host,
+            'server.socket_port': port,
+            'log.screen': args.debug,
+            'request.show_tracebacks': args.debug
+        })
 
-def start_web_server(config: dict, loggingQueue=None) -> None:
-    """Start SpiderFoot web server.
+        mp.set_start_method("spawn", force=True)
+        loggingQueue = mp.Queue()
+        logListenerSetup(loggingQueue, sfConfig)
 
-    Args:
-        config: SpiderFoot configuration
-        loggingQueue: Logging queue for multiprocessing
-    """
-    log.info("Starting web server")
+        if not args.debug:
+            cherrypy.log.screen = False
 
-    web_host = "127.0.0.1"
-    web_port = 5001
-    web_root = "/"
+        print(f"Starting web server at http://{host}:{port}/")
 
-    # Override defaults from config
-    if config.get("__webserver_host"):
-        web_host = config["__webserver_host"]
-    if config.get("__webserver_port"):
-        web_port = config["__webserver_port"]
-    if config.get("__webserver_root"):
-        web_root = config["__webserver_root"]
+        # Initialize the web server
+        webapp = SpiderFootWebUi(sfWebUiConfig, sfConfig, loggingQueue)
 
-    # Initialize the web server
-    cherrypy.config.update(
-        {"server.socket_host": web_host, "server.socket_port": int(web_port)}
+        # Configure and start the web server
+        cherrypy.quickstart(webapp, script_name=web_config['root'])
+
+        return
+
+    # We're not starting the web server, so run the command-line scan
+    if not args.s:
+        print("You need to specify a target with -s.")
+        sys.exit(-1)
+
+    if not args.m and not args.t:
+        print("You need to specify scan modules with -m or event types with -t.")
+        sys.exit(-1)
+
+    if not args.n:
+        print("No name specified, will use the current timestamp.")
+        args.n = SpiderFootHelpers.genScanInstanceId()
+
+    # Define the scan ID
+    scan_id = SpiderFootHelpers.genScanInstanceId()
+
+    # Initialize logging
+    mp.set_start_method("spawn", force=True)
+    loggingQueue = mp.Queue()
+    logListenerSetup(loggingQueue, sfConfig)
+    logWorkerSetup(loggingQueue)
+
+    # Start a scan
+    args.m = args.m.split(",") if args.m else []
+    args.t = args.t.split(",") if args.t else []
+
+    mods = args.m
+    if len(args.t) > 0:
+        # If scan modules specified, they take precedence
+        sf = SpiderFoot(sfConfig)
+        mods = sf.modulesProducing(args.t)
+
+    # Add mandatory modules
+    if "sfp__stor_db" not in mods:
+        mods.append("sfp__stor_db")
+
+    if args.f:
+        sfConfig['_dnsresolver'] = False
+    
+    # Start the scan
+    p = mp.Process(
+        target=startSpiderFootScanner,
+        args=(loggingQueue, args.n, scan_id, args.s, target_type, mods, sfConfig)
     )
+    p.daemon = True
+    p.start()
+    p.join()
 
-    log.info(f"Starting web server at http://{web_host}:{web_port}{web_root}")
-
-    # Initialize the web interface
-    webapp = SpiderFootWebUi(config)
-
-    # Configure the web server
-    cherrypy_conf = {
-        "global": {"server.socket_host": web_host, "server.socket_port": int(web_port)},
-        "/": {
-            "tools.sessions.on": True,
-            "tools.sessions.timeout": 60 * 60 * 24,
-            "tools.staticdir.root": os.path.dirname(os.path.abspath(__file__)),
-            "tools.staticdir.dir": "static",
-        },
-        "/static": {"tools.staticdir.on": True, "tools.staticdir.dir": "static"},
-    }
-
-    # Start the web server
-    cherrypy.quickstart(webapp, script_name=web_root, config=cherrypy_conf)
-
-
-def handle_abort(signal, frame) -> None:
-    """Handle abortion of a running scan (CTRL+C).
-
-    Args:
-        signal: Signal received
-        frame: Current stack frame
-    """
-    log.info("Aborting...")
-    sys.exit(0)
-
+    # Wait for the scan to complete
+    print(f"Scan {scan_id} completed. Use the -l option to review results.")
+    
+    # Correlate the results if requested
+    if args.correlate:
+        print("Running correlation...")
+        dbh = SpiderFootDb(sfConfig)
+        dbh.scanInstanceCorrelations(scan_id)
+    
+    # Output scan results if output format specified
+    if args.o:
+        dbh = SpiderFootDb(sfConfig)
+        data = dbh.scanResultEvent(scan_id)
+        if args.o == "csv":
+            import csv
+            with open(f"{args.n}.csv", "w", newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["Type", "Module", "Source", "Data"])
+                for row in data:
+                    writer.writerow([row[4], row[3], row[2], row[1]])
+            print(f"CSV output written to {args.n}.csv")
+        elif args.o == "json":
+            import json
+            scan_data = []
+            for row in data:
+                scan_data.append({
+                    "type": row[4],
+                    "module": row[3],
+                    "source": row[2],
+                    "data": row[1]
+                })
+            with open(f"{args.n}.json", "w") as f:
+                json.dump(scan_data, f, indent=4)
+            print(f"JSON output written to {args.n}.json")
+        elif args.o == "tab":
+            with open(f"{args.n}.tsv", "w") as f:
+                for row in data:
+                    f.write(f"{row[4]}\t{row[3]}\t{row[2]}\t{row[1]}\n")
+            print(f"Tab-separated output written to {args.n}.tsv")
+        else:
+            print(f"Unknown output format: {args.o}")
 
 if __name__ == "__main__":
     main()

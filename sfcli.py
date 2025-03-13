@@ -38,6 +38,7 @@ ASCII_LOGO = f"""
         \/|__|           \/    \/          \/   
 {" ".join("SPIDERFOOT Open Source Intelligence Automation Tool " + __version__)}
                 by Agostino Panico | @poppopjmp 2025
+                by Steve Micallef | @binarypool 2017
                         
 """
 COPYRIGHT_INFO = "               by Agostino Panico | @poppopjmp  2025\n "

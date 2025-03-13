@@ -53,3 +53,5 @@ __all__ = [
     "generate_unique_id", "format_timestamp", "sanitize_input",
     "parse_comma_separated_list", "is_valid_target"
 ]
+
+# This file makes the directory a Python package

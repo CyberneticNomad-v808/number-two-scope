@@ -98,3 +98,26 @@ class SpiderFootHelpers:
     """
     # Copy the implementation of SpiderFootHelpers from the original location
     pass
+
+    def logPath(self) -> str:
+        """
+        Return the path to the log directory.
+        
+        Returns:
+            str: Path to the SpiderFoot log directory
+        """
+        import os
+        from pathlib import Path
+        
+        # Check if running from a Docker container
+        if os.path.exists("/home/spiderfoot/log"):
+            return "/home/spiderfoot/log"
+        
+        # Default to the user's home directory
+        home_dir = str(Path.home())
+        log_dir = os.path.join(home_dir, ".spiderfoot", "log")
+        
+        # Ensure log directory exists
+        os.makedirs(log_dir, exist_ok=True)
+        
+        return log_dir

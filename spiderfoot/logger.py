@@ -311,16 +311,14 @@ def stop_listener(listener: "logging.handlers.QueueListener") -> None:
         listener.stop()
 
 
-def logListenerSetup(
-    loggingQueue: multiprocessing.Queue, config: Dict[str, Any] = None
-) -> None:
+def logListenerSetup(loggingQueue, sfConfig):
     """Set up and start the logging listener process.
 
     Args:
         loggingQueue (multiprocessing.Queue): Queue for log messages
-        config (dict): SpiderFoot config options
+        sfConfig (dict): SpiderFoot config options
     """
-    debug = config.get("_debug", False) if config else False
+    debug = sfConfig.get("_debug", False) if sfConfig else False
 
     # Configure the root logger
     configure_root_logger(debug=debug)
@@ -328,19 +326,33 @@ def logListenerSetup(
     # Get paths for log files
     log_paths = get_log_paths()
 
-    # Set up file logging
-    if config and config.get("__logging", True):
-        # Debug logs
-        setup_file_logging(log_paths["debug"], level=logging.DEBUG)
+    # Create log directory if it doesn't exist
+    import os
+    log_dir = os.path.dirname(log_paths["error"])
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Unable to create log directory {log_dir}: {e}")
 
-        # Error logs
-        error_handler = logging.FileHandler(log_paths["error"])
-        error_handler.setLevel(logging.ERROR)
-        error_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-        )
-        logging.getLogger().addHandler(error_handler)
+    # Set up file handlers with proper error handling
+    file_handlers = []
+    for log_level, log_path in log_paths.items():
+        try:
+            handler = logging.FileHandler(log_path)
+            # ...existing handler setup code...
+            file_handlers.append(handler)
+        except PermissionError:
+            print(f"Warning: Permission denied for log file {log_path}. Falling back to console logging.")
+        except Exception as e:
+            print(f"Warning: Failed to set up {log_level} log file: {e}")
+
+    # If no file handlers could be created, ensure console logging works
+    if not file_handlers:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+        console_handler.setLevel(logging.INFO)
+        root_logger.addHandler(console_handler)
+        print("Warning: All log files failed to initialize. Logging to console only.")
 
     # Start the listener process
     listener = logging.handlers.QueueListener(

@@ -67,8 +67,8 @@ RUN pip install --no-cache-dir dnstwist snallygaster trufflehog wafw00f -t /tool
 
 ## Enable NMAP into the container to be fully used
 RUN setcap cap_net_raw,cap_net_admin=eip /usr/bin/nmap
-RUN mkdir -p /home/spiderfoot/.spiderfoot/log
 
+RUN chown -R spiderfoot:spiderfoot /home/spiderfoot/
 USER spiderfoot
 
 EXPOSE 5001

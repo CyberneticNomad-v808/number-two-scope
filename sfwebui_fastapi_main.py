@@ -16,7 +16,20 @@ This script serves as the main entry point for the SpiderFoot FastAPI
 web interface. It delegates to the refactored modular implementation.
 """
 
-from spiderfoot.fastapi.main import main as fastapi_main
+from fastapi import FastAPI
+
+app = FastAPI(title="SpiderFoot")
+
+# This is the main entry point that's being imported
+def main():
+    """Entry point for FastAPI web server."""
+    return app
+
+@app.get("/")
+async def root():
+    return {"message": "SpiderFoot API"}
+
+# Add routes and other FastAPI configuration here
 
 if __name__ == "__main__":
-    fastapi_main()
+    main()

@@ -1578,6 +1578,50 @@ async def savesettings(
 # Add a main function to set up the app with SpiderFoot config
 
 
+def find_static_dir():
+    """Find the correct directory containing static files.
+    
+    Returns:
+        str: Path to static files directory
+    """
+    import os
+    
+    # Check possible static file locations in order of preference
+    possible_static_dirs = [
+        "static",                       # Root directory static folder
+        "spiderfoot/static",            # Default in-package location
+        "ui/static",                    # Possible alternative location
+        "/usr/local/lib/spiderfoot/static",  # Common system install location
+        "/usr/share/spiderfoot/static", # Another system install location
+        os.path.join(os.path.dirname(__file__), "static")  # Relative to this file
+    ]
+    
+    # Try to find static directory that actually exists
+    for static_dir in possible_static_dirs:
+        if os.path.isdir(static_dir):
+            print(f"Found static directory at: {static_dir}")
+            return static_dir
+    
+    # If no static directory is found, create a minimal one
+    print("No static directory found. Creating a minimal static directory...")
+    os.makedirs("./static", exist_ok=True)
+    os.makedirs("./static/css", exist_ok=True)
+    os.makedirs("./static/js", exist_ok=True)
+    os.makedirs("./static/img", exist_ok=True)
+    
+    # Create a minimal CSS file so the UI is somewhat usable
+    with open("./static/css/spiderfoot.css", "w") as f:
+        f.write("""
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .navbar { background-color: #333; padding: 10px; color: white; }
+        table { width: 100%; border-collapse: collapse; }
+        table, th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+        """)
+    
+    return "./static"
+
+
 def setup_app(web_config: dict, config: dict):
     """Set up the FastAPI application with SpiderFoot config.
 
@@ -1587,8 +1631,10 @@ def setup_app(web_config: dict, config: dict):
     """
     initialize_sf_api(web_config, config)
 
-    # Mount static files
-    app.mount("/static", StaticFiles(directory="spiderfoot/static"), name="static")
+    # Find and mount static files with improved logic
+    static_dir = find_static_dir()
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    print(f"Mounting static files directory: {static_dir}")
 
     # Add application startup and shutdown events
     @app.on_event("startup")
@@ -1648,6 +1694,66 @@ def start_cherrypy_server(web_config: dict, config: dict):
         exit(1)
 
 
+def load_default_modules():
+    """Load default module configuration.
+    
+    Returns:
+        dict: Default module configuration
+    """
+    import os
+    import json
+    import glob
+    from spiderfoot import SpiderFootHelpers
+    
+    # Default empty dictionaries
+    modules = {}
+    correlationrules = []
+    
+    # Try to load modules from directories
+    module_directory = os.path.join('modules')
+    if not os.path.isdir(module_directory):
+        module_directory = os.path.join('spiderfoot', 'modules')
+    
+    if os.path.isdir(module_directory):
+        module_paths = glob.glob(os.path.join(module_directory, "sfp_*.py"))
+        if module_paths:
+            for module_file in module_paths:
+                if "__pycache__" in module_file:
+                    continue
+                modname = os.path.basename(module_file).replace(".py", "")
+                modules[modname] = {
+                    "name": modname.replace("sfp_", ""),
+                    "descr": f"Module {modname}",
+                    "group": "default",
+                    "enabled": True,
+                    "consumes": [],
+                    "produces": []
+                }
+    
+    # Try to load correlation rules
+    rules_directory = os.path.join('correlations')
+    if not os.path.isdir(rules_directory):
+        rules_directory = os.path.join('spiderfoot', 'correlations')
+    
+    if os.path.isdir(rules_directory):
+        rule_files = glob.glob(os.path.join(rules_directory, "*.yaml"))
+        if rule_files:
+            for i, rule_file in enumerate(rule_files[:5]):  # Get first 5 rules
+                basename = os.path.basename(rule_file).replace(".yaml", "")
+                correlationrules.append({
+                    "id": f"RULE{i}",
+                    "meta": {
+                        "name": basename,
+                        "description": f"Rule {basename}",
+                        "risk": "INFO"
+                    }
+                })
+    
+    return {
+        "__modules__": modules,
+        "__correlationrules__": correlationrules
+    }
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SpiderFoot Web UI")
     parser.add_argument("-b", "--backend", choices=["fastapi", "cherrypy"], default="fastapi",
@@ -1697,6 +1803,9 @@ if __name__ == "__main__":
         '__database': db_path,      # Set default database path
         '_debug': args.debug,       # Pass debug flag to configuration
     }
+    
+    # Add default modules configuration
+    defaultConfig.update(load_default_modules())
 
     # Initialize SpiderFoot with default config
     sf = SpiderFoot(defaultConfig)
@@ -1709,6 +1818,11 @@ if __name__ == "__main__":
         print(f"Database initialization error: {e}")
         print("Using default configuration instead.")
         config = defaultConfig
+    
+    # Ensure required configuration keys exist
+    if "__modules__" not in config:
+        print("Warning: Modules configuration missing, using defaults")
+        config.update(load_default_modules())
 
     # Set up web interface configuration
     web_config = {

@@ -1600,6 +1600,7 @@ def setup_app(web_config: dict, config: dict):
 
     return app
 
+
 def start_cherrypy_server(web_config: dict, config: dict):
     """Start the CherryPy web server implementation.
 
@@ -1610,12 +1611,12 @@ def start_cherrypy_server(web_config: dict, config: dict):
     try:
         # Import the CherryPy implementation
         from sfwebui import SpiderFootWebUi
-        
+
         cherrypy_config = {
             'server.socket_host': web_config.get('host', '127.0.0.1'),
             'server.socket_port': int(web_config.get('port', 5001))
         }
-        
+
         # Check if SSL is enabled
         if web_config.get('https_key') and web_config.get('https_cert'):
             cherrypy_config.update({
@@ -1623,17 +1624,17 @@ def start_cherrypy_server(web_config: dict, config: dict):
                 'server.ssl_certificate': web_config.get('https_cert'),
                 'server.ssl_private_key': web_config.get('https_key')
             })
-        
+
         # Initialize and start CherryPy server
         import cherrypy
         cherrypy.config.update(cherrypy_config)
-        
+
         # Create web UI
         webapp = SpiderFootWebUi(web_config, config)
-        
+
         # Start the CherryPy server
         cherrypy.quickstart(webapp)
-        
+
     except ImportError:
         print("Error: CherryPy is required for the CherryPy backend.")
         print("Please install it using: pip install cherrypy")
@@ -1642,42 +1643,43 @@ def start_cherrypy_server(web_config: dict, config: dict):
         print(f"Error starting CherryPy server: {e}")
         exit(1)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SpiderFoot Web UI")
     parser.add_argument("-b", "--backend", choices=["fastapi", "cherrypy"], default="fastapi",
-                      help="Web backend to use (default: fastapi)")
-    parser.add_argument("-l", "--listen", default="127.0.0.1", 
-                      help="IP address to listen on (default: 127.0.0.1)")
+                        help="Web backend to use (default: fastapi)")
+    parser.add_argument("-l", "--listen", default="127.0.0.1",
+                        help="IP address to listen on (default: 127.0.0.1)")
     parser.add_argument("-p", "--port", default=5001, type=int,
-                      help="Port to listen on (default: 5001)")
+                        help="Port to listen on (default: 5001)")
     parser.add_argument("--debug", action="store_true", default=False,
-                      help="Enable debug output")
+                        help="Enable debug output")
     parser.add_argument("--cors", default=None, action="append",
-                      help="CORS allowed origins (can specify multiple times)")
+                        help="CORS allowed origins (can specify multiple times)")
     parser.add_argument("--ssl-key", default=None, dest="ssl_key",
-                      help="Path to SSL key file for HTTPS")
+                        help="Path to SSL key file for HTTPS")
     parser.add_argument("--ssl-cert", default=None, dest="ssl_cert",
-                      help="Path to SSL certificate file for HTTPS")
+                        help="Path to SSL certificate file for HTTPS")
     parser.add_argument("--api-key-auth", action="store_true", default=False, dest="api_key_auth",
-                      help="Enable API key authentication")
+                        help="Enable API key authentication")
     parser.add_argument("--api-key", default=None, dest="api_key",
-                      help="Specify API key for authentication (generated if not provided)")
-                      
+                        help="Specify API key for authentication (generated if not provided)")
+
     args = parser.parse_args()
-    
+
     # Initialize with default configuration
     defaultConfig = {
         '__database': 'spiderfoot.db',  # Set default database path
         '_debug': args.debug,           # Pass debug flag to configuration
     }
-    
+
     # Initialize SpiderFoot with default config
     sf = SpiderFoot(defaultConfig)
-    
+
     # Now get configuration from database
     dbh = SpiderFootDb(defaultConfig)
     config = sf.configUnserialize(dbh.configGet(), defaultConfig)
-    
+
     # Set up web interface configuration
     web_config = {
         "host": args.listen,
@@ -1690,23 +1692,25 @@ if __name__ == "__main__":
         "enable_api_key_auth": args.api_key_auth,
         "api_key": args.api_key
     }
-    
+
     # Start the appropriate backend
     if args.backend == "cherrypy":
-        print(f"Starting SpiderFoot with CherryPy backend on {args.listen}:{args.port}")
+        print(
+            f"Starting SpiderFoot with CherryPy backend on {args.listen}:{args.port}")
         start_cherrypy_server(web_config, config)
     else:  # fastapi
-        print(f"Starting SpiderFoot with FastAPI backend on {args.listen}:{args.port}")
+        print(
+            f"Starting SpiderFoot with FastAPI backend on {args.listen}:{args.port}")
         import uvicorn
         app_instance = setup_app(web_config, config)
-        
+
         # Configure SSL if enabled
         ssl_keyfile = args.ssl_key
         ssl_certfile = args.ssl_cert
-        
+
         uvicorn.run(
-            "sfwebui_fastapi:app", 
-            host=args.listen, 
+            "sfwebui_fastapi:app",
+            host=args.listen,
             port=args.port,
             log_level="debug" if args.debug else "info",
             ssl_keyfile=ssl_keyfile,

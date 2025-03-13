@@ -1148,15 +1148,19 @@ def initialize_sf_api(web_config: dict, config: dict):
     global sf_api_instance
     sf_api_instance = SpiderFootFastApi(web_config, config)
 
-    # Set up utilities
-    setup_logging(app, log_level=logging.DEBUG if config.get(
-        "_debug") else logging.INFO)
-    setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
-    setup_cors(
-        app,
-        allowed_origins=web_config.get(
-            "cors", ["http://127.0.0.1", "http://localhost"])
-    )
+    # Set up utilities with error handling
+    try:
+        # Modified setup_logging call to pass debug flag instead of log_level
+        setup_logging(app, debug=config.get("_debug", False))
+        setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
+        setup_cors(
+            app,
+            allowed_origins=web_config.get(
+                "cors", ["http://127.0.0.1", "http://localhost"])
+        )
+    except Exception as e:
+        print(f"Warning: Error setting up utilities: {e}")
+        print("Continuing with default configuration...")
 
     return sf_api_instance
 

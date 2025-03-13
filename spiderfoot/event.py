@@ -7,7 +7,7 @@ to represent different types of data discovered during a scan.
 
 import hashlib
 import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, List
 
 from spiderfoot.logconfig import get_module_logger
 
@@ -27,6 +27,9 @@ class SpiderFootEvent:
         actualSource (str): Source module of the source event
         hash (str): Unique SHA256 hash of the event
         generated (float): UNIX timestamp when the event was generated
+        tags (List[str]): MISP-compatible taxonomic tags
+        misp_attributes (Dict[str, Any]): Additional MISP attribute values
+        misp_category (str): MISP category for this event
     """
 
     def __init__(
@@ -114,17 +117,29 @@ class SpiderFootEvent:
         self.risk = risk
         self.generated = time.time()
 
+        # MISP compatibility attributes
+        self.tags: List[str] = []
+        self.misp_attributes: Dict[str, Any] = {}
+        self.misp_category: Optional[str] = None
+
         # Get the hash of the source event
         if sourceEvent:
             self.sourceEventHash = sourceEvent.hash
             # Keep track of the source module by combining the event's module and source_module values
             self.actualSource = f"{sourceEvent.module}"
+            
+            # Inherit tags from source event
+            if hasattr(sourceEvent, 'tags'):
+                self.tags = sourceEvent.tags.copy()
         else:
             self.sourceEventHash = sourceEventHash or "ROOT"
             self.actualSource = module
 
         # Create a unique hash of the event to avoid reporting the same data multiple times
         self.hash = self._generateHash()
+
+        # Automatically add confidence tag based on confidence score
+        self._add_confidence_tag()
 
         self.log.debug(
             f"Created event {eventType}: {data[:30]}... from {module}")
@@ -146,13 +161,59 @@ class SpiderFootEvent:
         sha256.update(hash_components)
         return sha256.hexdigest()
 
+    def _add_confidence_tag(self) -> None:
+        """Add a confidence tag based on the confidence score."""
+        if self.confidence >= 75:
+            self.add_tag("confidence:high")
+        elif self.confidence >= 40:
+            self.add_tag("confidence:medium")
+        else:
+            self.add_tag("confidence:low")
+
+    def add_tag(self, tag: str) -> None:
+        """Add a MISP-compatible taxonomic tag.
+
+        Args:
+            tag: Tag to add (e.g., 'tlp:amber', 'confidence:high')
+        """
+        if tag not in self.tags:
+            self.tags.append(tag)
+
+    def set_misp_category(self, category: str) -> None:
+        """Set the MISP category for this event.
+
+        Args:
+            category: MISP category (e.g., 'Network activity', 'Person')
+        """
+        self.misp_category = category
+
+    def set_misp_attribute(self, key: str, value: Any) -> None:
+        """Set a MISP attribute for this event.
+
+        Args:
+            key: Attribute name
+            value: Attribute value
+        """
+        self.misp_attributes[key] = value
+
+    def get_misp_type(self) -> str:
+        """Get the appropriate MISP attribute type for this event.
+
+        Returns:
+            str: MISP attribute type
+        """
+        from spiderfoot.misp_integration import MispIntegration
+        
+        mapping = MispIntegration.get_misp_type_mapping()
+        return mapping.get(self.eventType, "text")
+
     def asDict(self) -> Dict[str, Any]:
         """Get event as dictionary.
 
         Returns:
             dict: Event as a dictionary
         """
-        return {
+        event_dict = {
             "type": self.eventType,
             "data": self.data,
             "module": self.module,
@@ -164,6 +225,18 @@ class SpiderFootEvent:
             "actualSource": self.actualSource,
             "generated": self.generated,
         }
+        
+        # Add MISP attributes if present
+        if hasattr(self, 'tags') and self.tags:
+            event_dict["tags"] = self.tags
+            
+        if hasattr(self, 'misp_category') and self.misp_category:
+            event_dict["misp_category"] = self.misp_category
+            
+        if hasattr(self, 'misp_attributes') and self.misp_attributes:
+            event_dict["misp_attributes"] = self.misp_attributes
+            
+        return event_dict
 
     def __str__(self) -> str:
         """Get a string representation of the event.

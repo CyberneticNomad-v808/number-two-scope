@@ -1,18 +1,20 @@
 """SpiderFoot: Open Source Intelligence Automation."""
 
-# Break circular imports by exposing specific parts at top level
-# without importing the full modules
-from .threadpool import SpiderFootThreadPool
+# Import base components that don't have dependencies on other modules
+from .db import SpiderFootDb
+from .event import SpiderFootEvent
+from .helpers import SpiderFootHelpers
+
+# Now we can safely import the plugin module
 from .plugin import SpiderFootPlugin
 from .logger import logListenerSetup, logWorkerSetup
 from spiderfoot.version import __version__  # noqa
 
 # Expose these classes/functions at the package level
 # but import them in functions where needed
-SpiderFootDb = None
-SpiderFootHelpers = None
 SpiderFootCorrelator = None
 SpiderFootTarget = None
+MispIntegration = None
 
 
 def set_target(target_value, target_type):
@@ -47,10 +49,6 @@ def get_db(opts):
         SpiderFootDb: database object
     """
     global SpiderFootDb
-    if SpiderFootDb is None:
-        from spiderfoot.db import SpiderFootDb as SFDb
-
-        SpiderFootDb = SFDb
     return SpiderFootDb(opts)
 
 
@@ -84,11 +82,26 @@ def get_helpers():
         SpiderFootHelpers: helpers object
     """
     global SpiderFootHelpers
-    if SpiderFootHelpers is None:
-        from spiderfoot.helpers import SpiderFootHelpers as SFHelpers
-
-        SpiderFootHelpers = SFHelpers
     return SpiderFootHelpers
+
+
+def get_misp_integration(dbh):
+    """Initialize and return a MISP integration object.
+
+    This avoids circular imports by importing the module only when needed.
+
+    Args:
+        dbh (SpiderFootDb): database handle
+
+    Returns:
+        MispIntegration: MISP integration object
+    """
+    global MispIntegration
+    if MispIntegration is None:
+        from spiderfoot.misp_integration import MispIntegration as MIIntegration
+
+        MispIntegration = MIIntegration
+    return MispIntegration(dbh)
 
 
 class SpiderFootStaticJS:
@@ -124,4 +137,5 @@ __all__ = [
     "logWorkerSetup",
     "SpiderFootThreadPool",
     "SpiderFootCorrelator",
+    "MispIntegration"
 ]

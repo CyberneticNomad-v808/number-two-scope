@@ -17,7 +17,8 @@ import inspect
 from typing import Any, Dict, Optional, List
 
 from .threadpool import SpiderFootThreadPool
-from spiderfoot import SpiderFootDb, SpiderFootEvent
+from spiderfoot.db import SpiderFootDb
+from spiderfoot.event import SpiderFootEvent
 from spiderfoot.logconfig import get_module_logger
 from spiderfoot.error_handling import error_handler, handle_exception
 from spiderfoot.request_handler import RequestHandler

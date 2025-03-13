@@ -696,3 +696,20 @@ python3 ./sf.py --rest-api
 2. Open your web browser and navigate to `http://127.0.0.1:8000/docs`.
 
 The Swagger UI provides an interactive interface for testing the API endpoints, viewing request and response details, and exploring the available API documentation.
+
+## MISP Integration
+
+SpiderFoot supports integration with [MISP](https://www.misp-project.org/) (Malware Information Sharing Platform), allowing you to:
+
+- Export scan results to MISP-compatible format
+- Publish results directly to a MISP instance
+- Use MISP taxonomies for data classification
+- Create structured MISP objects from SpiderFoot data
+
+To use the MISP integration with direct publishing capabilities:
+
+```bash
+pip install -r requirements-misp.txt
+```
+
+Learn more in the [MISP integration documentation](docs/MISP_INTEGRATION.md).

@@ -187,6 +187,134 @@ class SpiderFootDb:
         "CREATE INDEX IF NOT EXISTS idx_scan_correlation_events ON tbl_scan_correlation_results_events (correlation_id)",
     ]
 
+    # Additional schema for MISP support
+    misp_schema_SQLite = [
+        "CREATE TABLE IF NOT EXISTS tbl_misp_taxonomies ( \
+            id             INTEGER PRIMARY KEY AUTOINCREMENT, \
+            namespace      VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            enabled        INTEGER NOT NULL DEFAULT 1 \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_predicates ( \
+            id             INTEGER PRIMARY KEY AUTOINCREMENT, \
+            taxonomy_id    INTEGER NOT NULL REFERENCES tbl_misp_taxonomies(id), \
+            value          VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            UNIQUE(taxonomy_id, value) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_entries ( \
+            id             INTEGER PRIMARY KEY AUTOINCREMENT, \
+            predicate_id   INTEGER NOT NULL REFERENCES tbl_misp_predicates(id), \
+            value          VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            UNIQUE(predicate_id, value) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_results_tags ( \
+            scan_instance_id    VARCHAR NOT NULL, \
+            result_hash         VARCHAR NOT NULL, \
+            tag                 VARCHAR NOT NULL, \
+            UNIQUE(scan_instance_id, result_hash, tag), \
+            FOREIGN KEY(scan_instance_id, result_hash) REFERENCES tbl_scan_results(scan_instance_id, hash) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_objects ( \
+            id                  VARCHAR NOT NULL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            name                VARCHAR NOT NULL, \
+            description         VARCHAR, \
+            template_uuid       VARCHAR, \
+            template_version    VARCHAR, \
+            meta                TEXT, \
+            timestamp           INTEGER NOT NULL, \
+            distribution        INTEGER, \
+            sharing_group_id    INTEGER \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_attributes ( \
+            id                  VARCHAR NOT NULL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            object_id           VARCHAR REFERENCES tbl_misp_objects(id), \
+            type                VARCHAR NOT NULL, \
+            category            VARCHAR, \
+            value               VARCHAR NOT NULL, \
+            to_ids              INTEGER NOT NULL DEFAULT 0, \
+            comment             VARCHAR, \
+            distribution        INTEGER, \
+            sharing_group_id    INTEGER, \
+            timestamp           INTEGER NOT NULL, \
+            result_hash         VARCHAR, \
+            FOREIGN KEY(scan_instance_id, result_hash) REFERENCES tbl_scan_results(scan_instance_id, hash) \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_misp_taxonomies ON tbl_misp_taxonomies (namespace)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_predicates ON tbl_misp_predicates (taxonomy_id)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_entries ON tbl_misp_entries (predicate_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_tags ON tbl_scan_results_tags (scan_instance_id, result_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_objects ON tbl_misp_objects (scan_instance_id)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_attributes ON tbl_misp_attributes (scan_instance_id, object_id)"
+    ]
+    
+    # Same tables for PostgreSQL
+    misp_schema_PostgreSQL = [
+        "CREATE TABLE IF NOT EXISTS tbl_misp_taxonomies ( \
+            id             SERIAL PRIMARY KEY, \
+            namespace      VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            enabled        INTEGER NOT NULL DEFAULT 1 \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_predicates ( \
+            id             SERIAL PRIMARY KEY, \
+            taxonomy_id    INTEGER NOT NULL REFERENCES tbl_misp_taxonomies(id), \
+            value          VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            UNIQUE(taxonomy_id, value) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_entries ( \
+            id             SERIAL PRIMARY KEY, \
+            predicate_id   INTEGER NOT NULL REFERENCES tbl_misp_predicates(id), \
+            value          VARCHAR NOT NULL, \
+            description    VARCHAR, \
+            UNIQUE(predicate_id, value) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_scan_results_tags ( \
+            scan_instance_id    VARCHAR NOT NULL, \
+            result_hash         VARCHAR NOT NULL, \
+            tag                 VARCHAR NOT NULL, \
+            UNIQUE(scan_instance_id, result_hash, tag), \
+            FOREIGN KEY(scan_instance_id, result_hash) REFERENCES tbl_scan_results(scan_instance_id, hash) \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_objects ( \
+            id                  VARCHAR NOT NULL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            name                VARCHAR NOT NULL, \
+            description         VARCHAR, \
+            template_uuid       VARCHAR, \
+            template_version    VARCHAR, \
+            meta                TEXT, \
+            timestamp           INTEGER NOT NULL, \
+            distribution        INTEGER, \
+            sharing_group_id    INTEGER \
+        )",
+        "CREATE TABLE IF NOT EXISTS tbl_misp_attributes ( \
+            id                  VARCHAR NOT NULL PRIMARY KEY, \
+            scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
+            object_id           VARCHAR REFERENCES tbl_misp_objects(id), \
+            type                VARCHAR NOT NULL, \
+            category            VARCHAR, \
+            value               VARCHAR NOT NULL, \
+            to_ids              INTEGER NOT NULL DEFAULT 0, \
+            comment             VARCHAR, \
+            distribution        INTEGER, \
+            sharing_group_id    INTEGER, \
+            timestamp           INTEGER NOT NULL, \
+            result_hash         VARCHAR, \
+            FOREIGN KEY(scan_instance_id, result_hash) REFERENCES tbl_scan_results(scan_instance_id, hash) \
+        )",
+        "CREATE INDEX IF NOT EXISTS idx_misp_taxonomies ON tbl_misp_taxonomies (namespace)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_predicates ON tbl_misp_predicates (taxonomy_id)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_entries ON tbl_misp_entries (predicate_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scan_results_tags ON tbl_scan_results_tags (scan_instance_id, result_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_objects ON tbl_misp_objects (scan_instance_id)",
+        "CREATE INDEX IF NOT EXISTS idx_misp_attributes ON tbl_misp_attributes (scan_instance_id, object_id)"
+    ]
+
     eventDetails = [
         ["ROOT", "Internal SpiderFoot Root event", 1, "INTERNAL"],
         ["ACCOUNT_EXTERNAL_OWNED", "Account on External Site", 0, "ENTITY"],
@@ -542,6 +670,15 @@ class SpiderFootDb:
                     if self.db_type == "SQLITE"
                     else self.createSchemaQueriesPostgreSQL
                 )
+                
+                # Add MISP schema queries
+                misp_queries = (
+                    self.misp_schema_SQLite
+                    if self.db_type == "SQLITE"
+                    else self.misp_schema_PostgreSQL
+                )
+                queries = queries + misp_queries
+                
                 for query in queries:
                     try:
                         if not query.strip():
@@ -2199,3 +2336,187 @@ class SpiderFootDb:
                     ) from e
 
         return uniqueId
+
+    # Add methods to work with tags
+    def eventAddTag(self, instanceId: str, resultHash: str, tag: str) -> bool:
+        """Add a tag to an event.
+
+        Args:
+            instanceId (str): scan instance ID
+            resultHash (str): hash of the result to tag
+            tag (str): tag to add
+
+        Returns:
+            bool: success
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
+            
+        if not isinstance(resultHash, str):
+            raise TypeError(f"resultHash is {type(resultHash)}; expected str()")
+            
+        if not isinstance(tag, str):
+            raise TypeError(f"tag is {type(tag)}; expected str()")
+            
+        qry = "INSERT OR IGNORE INTO tbl_scan_results_tags \
+                (scan_instance_id, result_hash, tag) \
+                VALUES (?, ?, ?)"
+                
+        if self.db_type == "POSTGRESQL":
+            qry = qry.replace("INSERT OR IGNORE", "INSERT")
+            qry += " ON CONFLICT DO NOTHING"
+                
+        qvars = [instanceId, resultHash, tag]
+        
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                self.conn.commit()
+                return True
+            except Exception as e:
+                self.log.error(f"Error adding tag: {e}")
+                return False
+
+    def eventGetTags(self, instanceId: str, resultHash: str) -> list:
+        """Get tags for an event.
+
+        Args:
+            instanceId (str): scan instance ID
+            resultHash (str): hash of the result
+
+        Returns:
+            list: tags
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
+            
+        if not isinstance(resultHash, str):
+            raise TypeError(f"resultHash is {type(resultHash)}; expected str()")
+            
+        qry = "SELECT tag FROM tbl_scan_results_tags \
+                WHERE scan_instance_id = ? AND result_hash = ?"
+                
+        qvars = [instanceId, resultHash]
+        
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return [r[0] for r in self.dbh.fetchall()]
+            except Exception as e:
+                self.log.error(f"Error getting tags: {e}")
+                return []
+                
+    def taxonomyCreate(self, namespace: str, description: str = None) -> int:
+        """Create a MISP taxonomy.
+
+        Args:
+            namespace (str): taxonomy namespace
+            description (str): taxonomy description
+
+        Returns:
+            int: taxonomy ID
+
+        Raises:
+            TypeError: arg type was invalid
+            IOError: database I/O failed
+        """
+        if not isinstance(namespace, str):
+            raise TypeError(f"namespace is {type(namespace)}; expected str()")
+            
+        qry = "INSERT INTO tbl_misp_taxonomies (namespace, description) VALUES (?, ?)"
+        qvars = [namespace, description]
+        
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                self.conn.commit()
+                
+                # Get the ID of the new taxonomy
+                if self.db_type == "SQLITE":
+                    return self.dbh.lastrowid
+                else:
+                    self.dbh.execute("SELECT lastval()")
+                    return self.dbh.fetchone()[0]
+            except Exception as e:
+                self.log.error(f"Error creating taxonomy: {e}")
+                return -1
+    
+    def storeObject(self, mispObject, linkEvents: bool = True) -> bool:
+        """Store a MISP object in the database.
+        
+        Args:
+            mispObject: MISP object to store
+            linkEvents: Whether to link the object to existing events
+            
+        Returns:
+            bool: Success
+        """
+        from spiderfoot.misp_integration import MispObject
+        
+        if not isinstance(mispObject, MispObject):
+            self.log.error(f"mispObject is {type(mispObject)}; expected MispObject()")
+            return False
+            
+        # Store the object
+        qry = "INSERT INTO tbl_misp_objects \
+                (id, scan_instance_id, name, description, template_uuid, \
+                template_version, meta, timestamp, distribution, sharing_group_id) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                
+        objData = mispObject.to_dict()
+        qvars = [
+            mispObject.uuid, 
+            objData.get('scan_instance_id', ''),
+            mispObject.name,
+            mispObject.description,
+            mispObject.template_uuid,
+            mispObject.template_version,
+            json.dumps(mispObject.meta),
+            mispObject.timestamp,
+            mispObject.distribution,
+            mispObject.sharing_group_id
+        ]
+        
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                self.conn.commit()
+                
+                # Store attributes
+                for attr in mispObject.attributes:
+                    qry = "INSERT INTO tbl_misp_attributes \
+                           (id, scan_instance_id, object_id, type, category, value, \
+                           to_ids, comment, distribution, sharing_group_id, timestamp, result_hash) \
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                           
+                    attrData = attr.to_dict()
+                    qvars = [
+                        attr.uuid,
+                        objData.get('scan_instance_id', ''),
+                        mispObject.uuid,
+                        attr.type,
+                        attr.category,
+                        attr.value,
+                        1 if attr.to_ids else 0,
+                        attr.comment,
+                        attr.distribution,
+                        attr.sharing_group_id,
+                        attr.timestamp,
+                        attrData.get('result_hash', None)
+                    ]
+                    
+                    self.dbh.execute(qry, qvars)
+                
+                self.conn.commit()
+                return True
+            except Exception as e:
+                self.log.error(f"Error storing MISP object: {e}")
+                return False

@@ -57,13 +57,13 @@ class sfp_misp(SpiderFootPlugin):
         'confidence_threshold': "Minimum confidence score (0-100) for including events",
         'enable_auto_publishing': "Automatically publish events to MISP"
     }
-    
+
     # Required for proper setup
     results = None
     errorState = False
     misp_event = None
     scan_object_count = 0
-    
+
     def setup(self, sfc, userOpts=dict()):
         """Set up the module.
 
@@ -73,14 +73,15 @@ class sfp_misp(SpiderFootPlugin):
         """
         self.sf = sfc
         self.results = self.tempStorage()
-        
+
         # Initialize MISP integration
-        self.misp_integration = self.sf._dbh and self.sf.get_misp_integration(self.sf._dbh)
-        
+        self.misp_integration = self.sf._dbh and self.sf.get_misp_integration(
+            self.sf._dbh)
+
         # Process user options
         for opt in list(userOpts.keys()):
             self.opts[opt] = userOpts[opt]
-            
+
         # Create MISP event for this scan
         if self.opts['create_misp_event']:
             self._create_misp_event()
@@ -90,15 +91,15 @@ class sfp_misp(SpiderFootPlugin):
         if not self.misp_integration:
             self.sf.error("MISP integration not available")
             return
-            
+
         scan_info = self.sf._dbh.scanInstanceGet(self.getScanId())
         if not scan_info:
             self.sf.error(f"Could not find scan {self.getScanId()}")
             return
-            
+
         scan_name = scan_info[0]
         scan_target = scan_info[1]
-        
+
         # Initialize MISP event
         self.misp_event = MispEvent(
             info=f"SpiderFoot Scan: {scan_name}",
@@ -107,11 +108,11 @@ class sfp_misp(SpiderFootPlugin):
             distribution=0,  # Your organization only
             timestamp=int(time.time())
         )
-        
+
         # Add TLP tag
         if self.opts['tag_tlp']:
             self.misp_event.add_tag(self.opts['tag_tlp'])
-            
+
         # Add basic target attribute
         if "." in scan_target:
             attr_type = "domain" if scan_target.count(".") == 1 else "hostname"
@@ -119,7 +120,7 @@ class sfp_misp(SpiderFootPlugin):
             attr_type = "ip-dst" if "://" not in scan_target else "url"
         else:
             attr_type = "text"
-            
+
         self.misp_event.add_attribute(
             MispAttribute(
                 type=attr_type,
@@ -153,18 +154,18 @@ class sfp_misp(SpiderFootPlugin):
             sfEvent (SpiderFootEvent): SpiderFoot event
         """
         eventName = sfEvent.eventType
-        
+
         # Skip internal events and events with low confidence
         if eventName == "ROOT" or sfEvent.confidence < self.opts['confidence_threshold']:
             return
-            
+
         # Skip if no MISP integration available
         if not self.misp_integration:
             return
-            
+
         # Convert SF event to MISP attribute
         misp_attribute = self.sf.convert_sf_event_to_misp_attribute(sfEvent)
-        
+
         # Add to MISP event if we're creating one
         if self.misp_event and self.opts['create_misp_event']:
             if self.opts['create_misp_objects']:
@@ -181,46 +182,49 @@ class sfp_misp(SpiderFootPlugin):
             else:
                 # Add attributes directly to event
                 self.misp_event.add_attribute(misp_attribute)
-                
+
         # Store tags in database
         if hasattr(sfEvent, 'tags') and sfEvent.tags:
             for tag in sfEvent.tags:
                 self.sf._dbh.eventAddTag(self.getScanId(), sfEvent.hash, tag)
-                
+
     def finish(self):
         """Finalize processing and export MISP data."""
         if not self.misp_event:
             return
-            
+
         # Export the MISP event to JSON
         misp_json = self.sf.export_misp_event(self.misp_event, "json")
-        
+
         # Log some information about what we created
-        self.sf.info(f"Created MISP event with {len(self.misp_event.attributes)} attributes and {len(self.misp_event.objects)} objects")
-        
+        self.sf.info(
+            f"Created MISP event with {len(self.misp_event.attributes)} attributes and {len(self.misp_event.objects)} objects")
+
         # If direct publishing is configured, publish to MISP
         if self.opts['enable_auto_publishing'] and self.opts['misp_url'] and self.opts['misp_key']:
             self._publish_to_misp()
-            
+
     def _publish_to_misp(self):
         """Publish the event to a MISP instance."""
         try:
             from pymisp import PyMISP, MISPEvent
-            
+
             # Convert our MISP event to PyMISP format
             misp_json = self.sf.export_misp_event(self.misp_event, "json")
             pymisp_event = MISPEvent()
             pymisp_event.from_dict(**json.loads(misp_json))
-            
+
             # Connect to MISP
             misp = PyMISP(self.opts['misp_url'], self.opts['misp_key'], False)
-            
+
             # Add event to MISP
             response = misp.add_event(pymisp_event)
-            
+
             if 'errors' in response:
-                self.sf.error(f"Error publishing to MISP: {response['errors']}")
+                self.sf.error(
+                    f"Error publishing to MISP: {response['errors']}")
             else:
-                self.sf.info(f"Successfully published event to MISP with ID: {response['Event']['id']}")
+                self.sf.info(
+                    f"Successfully published event to MISP with ID: {response['Event']['id']}")
         except Exception as e:
             self.sf.error(f"Failed to publish to MISP: {e}")

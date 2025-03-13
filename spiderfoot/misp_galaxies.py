@@ -28,7 +28,7 @@ class MispGalaxy:
         self.description = description
         self.uuid = uuid
         self.clusters: List[Dict[str, Any]] = []
-        
+
     def add_cluster(self, cluster: Dict[str, Any]) -> None:
         """Add a cluster to the galaxy.
 
@@ -36,7 +36,7 @@ class MispGalaxy:
             cluster: Cluster data
         """
         self.clusters.append(cluster)
-        
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the galaxy to a dictionary.
 
@@ -59,7 +59,7 @@ class MispGalaxyManager:
         self.log = get_module_logger('misp_galaxies')
         self.galaxies: Dict[str, MispGalaxy] = {}
         self.load_predefined_galaxies()
-        
+
     def load_predefined_galaxies(self) -> None:
         """Load predefined MISP galaxies."""
         # Threat Actor Galaxy
@@ -68,7 +68,7 @@ class MispGalaxyManager:
             "Threat Actor Galaxy",
             "698774c7-8022-42c4-917f-8d6e4f06ada3"
         )
-        
+
         # Add APT groups
         threat_actor.add_cluster({
             "value": "APT1",
@@ -79,7 +79,7 @@ class MispGalaxyManager:
                 "refs": ["https://www.fireeye.com/content/dam/fireeye-www/services/pdfs/mandiant-apt1-report.pdf"]
             }
         })
-        
+
         threat_actor.add_cluster({
             "value": "APT28",
             "description": "APT28 is a threat group that has been attributed to Russia's General Staff Main Intelligence Directorate (GRU) 85th Main Special Service Center (GTsSS) military unit 26165.",
@@ -89,16 +89,16 @@ class MispGalaxyManager:
                 "refs": ["https://www.fireeye.com/blog/threat-research/2014/10/apt28-a-window-into-russias-cyber-espionage-operations.html"]
             }
         })
-        
+
         self.galaxies["threat-actor"] = threat_actor
-        
+
         # Attack Pattern Galaxy
         attack_pattern = MispGalaxy(
             "attack-pattern",
             "Attack Pattern Galaxy",
             "b5a533ef-e030-4e3d-9671-89f5c8c31415"
         )
-        
+
         attack_pattern.add_cluster({
             "value": "Spearphishing Attachment",
             "description": "Spearphishing attachment is a specific variant of spearphishing. Spearphishing attachment is different from other forms of spearphishing in that it employs the use of malware attached to an email. All forms of spearphishing are electronically delivered social engineering targeted at a specific individual, company, or industry.",
@@ -107,16 +107,16 @@ class MispGalaxyManager:
                 "refs": ["https://attack.mitre.org/techniques/T1193/"]
             }
         })
-        
+
         self.galaxies["attack-pattern"] = attack_pattern
-        
+
         # Tool Galaxy
         tool_galaxy = MispGalaxy(
             "tool",
             "Tool Galaxy",
             "d5cbd1a2-78f6-4c89-acb0-d46f9ca827a2"
         )
-        
+
         tool_galaxy.add_cluster({
             "value": "Mimikatz",
             "description": "Mimikatz is a credential dumper capable of obtaining plaintext Windows account logins and passwords, along with many other features that make it useful for testing the security of networks.",
@@ -124,9 +124,9 @@ class MispGalaxyManager:
                 "refs": ["https://github.com/gentilkiwi/mimikatz"]
             }
         })
-        
+
         self.galaxies["tool"] = tool_galaxy
-        
+
     def get_galaxy(self, name: str) -> Optional[MispGalaxy]:
         """Get a galaxy by name.
 
@@ -137,7 +137,7 @@ class MispGalaxyManager:
             MispGalaxy: Galaxy object or None if not found
         """
         return self.galaxies.get(name)
-        
+
     def add_galaxy(self, galaxy: MispGalaxy) -> None:
         """Add a galaxy.
 

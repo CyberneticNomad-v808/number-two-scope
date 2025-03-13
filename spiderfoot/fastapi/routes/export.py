@@ -13,9 +13,10 @@ from spiderfoot.fastapi.dependencies import get_sf_api, get_api_auth
 # Create router with API key dependency
 router = APIRouter(tags=["Export"], dependencies=[Depends(get_api_auth)])
 
+
 @router.get("/scanexportlogs")
 async def export_scan_logs(
-    id: str, 
+    id: str,
     dialect: str = "excel",
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
@@ -38,6 +39,7 @@ async def export_scan_logs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to export logs: {str(e)}"
         )
+
 
 @router.get("/scaneventresultexport")
 async def export_scan_event_results(
@@ -69,10 +71,11 @@ async def export_scan_event_results(
             detail=f"Failed to export event results: {str(e)}"
         )
 
+
 @router.get("/scanviz")
 async def export_scan_visualization(
-    id: str, 
-    gexf: str = "0", 
+    id: str,
+    gexf: str = "0",
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export scan visualization data.
@@ -95,10 +98,11 @@ async def export_scan_visualization(
             detail=f"Failed to export visualization: {str(e)}"
         )
 
+
 @router.get("/scanvizmulti")
 async def export_multi_scan_visualization(
-    ids: str, 
-    gexf: str = "1", 
+    ids: str,
+    gexf: str = "1",
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export visualization for multiple scans.

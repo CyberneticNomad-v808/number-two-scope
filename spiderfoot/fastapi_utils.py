@@ -16,6 +16,11 @@ This is a legacy module that redirects to the new modular implementation.
 It's kept for backward compatibility.
 """
 
+from spiderfoot.fastapi.utils.security import (
+    generate_api_key,
+    setup_cors,
+    APIKeyAuth
+)
 import warnings
 
 # Show a deprecation warning
@@ -27,10 +32,5 @@ warnings.warn(
 )
 
 # Re-export from the new module structure
-from spiderfoot.fastapi.utils.security import (
-    generate_api_key,
-    setup_cors,
-    APIKeyAuth
-)
 
 __all__ = ["generate_api_key", "setup_cors", "APIKeyAuth"]

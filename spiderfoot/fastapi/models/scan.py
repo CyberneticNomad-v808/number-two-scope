@@ -14,9 +14,12 @@ class ScanCreate(BaseModel):
     """Model for creating a new scan."""
     scanname: str = Field(description="Name for the scan")
     scantarget: str = Field(description="Target for the scan")
-    modulelist: Optional[str] = Field(None, description="Comma-separated list of modules")
-    typelist: Optional[str] = Field(None, description="Comma-separated list of types")
-    usecase: Optional[str] = Field(None, description="Use case (all, passive, investigate, footprint)")
+    modulelist: Optional[str] = Field(
+        None, description="Comma-separated list of modules")
+    typelist: Optional[str] = Field(
+        None, description="Comma-separated list of types")
+    usecase: Optional[str] = Field(
+        None, description="Use case (all, passive, investigate, footprint)")
 
 
 class ScanResponse(BaseModel):

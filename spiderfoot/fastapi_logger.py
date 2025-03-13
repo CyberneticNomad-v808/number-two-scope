@@ -16,6 +16,12 @@ This is a legacy module that redirects to the new modular implementation.
 It's kept for backward compatibility.
 """
 
+from spiderfoot.fastapi.utils.logging import (
+    setup_logging,
+    get_logger,
+    LoggingMiddleware,
+    JSONLogFormatter
+)
 import warnings
 
 # Show a deprecation warning
@@ -27,11 +33,6 @@ warnings.warn(
 )
 
 # Re-export from the new module structure
-from spiderfoot.fastapi.utils.logging import (
-    setup_logging,
-    get_logger,
-    LoggingMiddleware,
-    JSONLogFormatter
-)
 
-__all__ = ["setup_logging", "get_logger", "LoggingMiddleware", "JSONLogFormatter"]
+__all__ = ["setup_logging", "get_logger",
+           "LoggingMiddleware", "JSONLogFormatter"]

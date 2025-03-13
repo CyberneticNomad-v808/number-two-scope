@@ -12,7 +12,9 @@ from spiderfoot.fastapi.dependencies import get_sf_api, get_api_auth
 from spiderfoot.fastapi.models.config import ConfigOptions, ConfigResponse
 
 # Create router with API key dependency
-router = APIRouter(tags=["Configuration"], dependencies=[Depends(get_api_auth)])
+router = APIRouter(tags=["Configuration"],
+                   dependencies=[Depends(get_api_auth)])
+
 
 @router.post("/savesettings")
 async def save_settings(
@@ -44,6 +46,7 @@ async def save_settings(
             detail=f"Failed to save settings: {str(e)}"
         )
 
+
 @router.post("/savesettingsraw", response_model=ConfigResponse)
 async def save_settings_raw(
     config_data: ConfigOptions,
@@ -68,6 +71,7 @@ async def save_settings_raw(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save settings: {str(e)}"
         )
+
 
 @router.get("/optsraw", response_model=Dict[str, Any])
 async def get_options_raw(sf_api: SpiderFootAPI = Depends(get_sf_api)):

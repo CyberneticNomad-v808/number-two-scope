@@ -50,7 +50,7 @@ from spiderfoot.fastapi_utils import setup_cors, APIKeyAuth, generate_api_key
 mp.set_start_method("spawn", force=True)
 
 app = FastAPI(
-    title="SpiderFoot API", 
+    title="SpiderFoot API",
     description="SpiderFoot OSINT Automation Tool API",
     version=__version__,
     docs_url="/api/docs",
@@ -65,9 +65,11 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 api_key_auth = None
 
 # We'll create a class similar to SpiderFootWebUi but adapted for FastAPI
+
+
 class SpiderFootFastApi:
     """SpiderFoot FastAPI web interface."""
-    
+
     def __init__(
         self,
         web_config: dict,
@@ -97,18 +99,18 @@ class SpiderFootFastApi:
             raise ValueError("web_config is empty")
 
         self.docroot = web_config.get("root", "/").rstrip("/")
-        
+
         # 'config' supplied will be the defaults, let's supplement them
         # now with any configuration which may have previously been saved.
         self.defaultConfig = deepcopy(config)
         dbh = SpiderFootDb(self.defaultConfig, init=True)
         sf = SpiderFoot(self.defaultConfig)
         self.config = sf.configUnserialize(dbh.configGet(), self.defaultConfig)
-        
+
         # Initialize templates - both Jinja2 for FastAPI and Mako for legacy templates
         self.templates = Jinja2Templates(directory="spiderfoot/templates")
         self.lookup = TemplateLookup(directories=[""])
-        
+
         # Set up logging
         if loggingQueue is None:
             self.loggingQueue = mp.Queue()
@@ -117,7 +119,7 @@ class SpiderFootFastApi:
             self.loggingQueue = loggingQueue
         logWorkerSetup(self.loggingQueue)
         self.log = logging.getLogger(f"spiderfoot.{__name__}")
-        
+
         # Security setup
         self.csp = (
             secure.ContentSecurityPolicy()
@@ -129,20 +131,21 @@ class SpiderFootFastApi:
             .frame_src("'self'", "data:")
             .img_src("'self'", "data:")
         )
-        
+
         # Generate a token for CSRF protection
         self.token = None
 
         # Set up logger
         self.log = get_logger(f"spiderfoot.{__name__}")
-        
+
         # Initialize API key auth if enabled
         global api_key_auth
         if web_config.get("enable_api_key_auth", False):
             api_key = web_config.get("api_key", generate_api_key())
-            api_key_auth = APIKeyAuth(api_key_name="X-API-Key", api_key=api_key)
+            api_key_auth = APIKeyAuth(
+                api_key_name="X-API-Key", api_key=api_key)
             self.log.info(f"API key authentication enabled. Key: {api_key}")
-    
+
     # Utility methods for error handling, response formatting, etc.
     def error_response(self, message: str, status_code: int = 500) -> JSONResponse:
         """Return JSON error response.
@@ -163,7 +166,7 @@ class SpiderFootFastApi:
                 }
             }
         )
-    
+
     def cleanUserInput(self, inputList: list) -> list:
         """Convert data to HTML entities; except quotes and ampersands.
 
@@ -192,7 +195,7 @@ class SpiderFootFastApi:
             ret.append(c)
 
         return ret
-    
+
     # Endpoints matching the CherryPy routes in sfwebui.py
     async def get_eventtypes(self) -> List[List[str]]:
         """List all event types.
@@ -208,7 +211,7 @@ class SpiderFootFastApi:
             ret.append([r[1], r[0]])
 
         return sorted(ret, key=itemgetter(0))
-    
+
     async def get_modules(self) -> List[Dict[str, str]]:
         """List all modules.
 
@@ -255,7 +258,7 @@ class SpiderFootFastApi:
             )
 
         return ret
-        
+
     async def do_ping(self) -> List[str]:
         """For the CLI to test connectivity to this server.
 
@@ -263,7 +266,7 @@ class SpiderFootFastApi:
             list: SpiderFoot version as JSON
         """
         return ["SUCCESS", __version__]
-    
+
     async def do_query(self, query: str) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """For the CLI to run queries against the database.
 
@@ -280,7 +283,7 @@ class SpiderFootFastApi:
 
         if not query.lower().startswith("select"):
             return {"error": {
-                "http_status": "400", 
+                "http_status": "400",
                 "message": "Non-SELECTs are unpredictable and not recommended."
             }}
 
@@ -291,11 +294,11 @@ class SpiderFootFastApi:
             return [dict(zip(columnNames, row)) for row in data]
         except Exception as e:
             return {"error": {"http_status": "500", "message": str(e)}}
-    
+
     async def search_data(
-        self, 
-        id: Optional[str] = None, 
-        eventType: Optional[str] = None, 
+        self,
+        id: Optional[str] = None,
+        eventType: Optional[str] = None,
         value: Optional[str] = None
     ) -> List[List[Any]]:
         """Search scans.
@@ -312,7 +315,7 @@ class SpiderFootFastApi:
             return self.searchBase(id, eventType, value)
         except Exception:
             return []
-    
+
     async def get_scanhistory(self, id: str) -> List[Any]:
         """Historical data for a scan.
 
@@ -331,7 +334,7 @@ class SpiderFootFastApi:
             return dbh.scanResultHistory(id)
         except Exception:
             return []
-    
+
     async def get_scanlist(self) -> List[List[Any]]:
         """Produce a list of scans.
 
@@ -378,7 +381,7 @@ class SpiderFootFastApi:
             )
 
         return retdata
-    
+
     async def get_scanstatus(self, id: str) -> List[Any]:
         """Show basic information about a scan, including status and number of
         each event type.
@@ -405,7 +408,7 @@ class SpiderFootFastApi:
                 riskmatrix[c[0]] = c[1]
 
         return [data[0], data[1], created, started, ended, data[5], riskmatrix]
-    
+
     async def delete_scan(self, id: str) -> Dict[str, Any]:
         """Delete scan(s).
 
@@ -424,7 +427,8 @@ class SpiderFootFastApi:
         for scan_id in ids:
             res = dbh.scanInstanceGet(scan_id)
             if not res:
-                raise HTTPException(status_code=404, detail=f"Scan {scan_id} does not exist")
+                raise HTTPException(
+                    status_code=404, detail=f"Scan {scan_id} does not exist")
 
             if res[5] in ["RUNNING", "STARTING", "STARTED"]:
                 raise HTTPException(
@@ -436,7 +440,7 @@ class SpiderFootFastApi:
             dbh.scanInstanceDelete(scan_id)
 
         return {"status": "success", "message": f"Successfully deleted {len(ids)} scan(s)"}
-    
+
     async def stop_scan(self, id: str) -> Dict[str, Any]:
         """Stop a scan.
 
@@ -455,7 +459,8 @@ class SpiderFootFastApi:
         for scan_id in ids:
             res = dbh.scanInstanceGet(scan_id)
             if not res:
-                raise HTTPException(status_code=404, detail=f"Scan {scan_id} does not exist")
+                raise HTTPException(
+                    status_code=404, detail=f"Scan {scan_id} does not exist")
 
             scan_status = res[5]
 
@@ -613,7 +618,8 @@ class SpiderFootFastApi:
             p.start()
         except Exception as e:
             self.log.error(f"[-] Scan [{scanId}] failed: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"[-] Scan [{scanId}] failed: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"[-] Scan [{scanId}] failed: {e}")
 
         # Wait until the scan has initialized
         # Check the database for the scan status results
@@ -622,7 +628,7 @@ class SpiderFootFastApi:
             time.sleep(1)
 
         return {"scan_id": scanId}
-    
+
     # HTML page rendering methods
     async def render_index(self, request: Request) -> HTMLResponse:
         """Show scan list page.
@@ -637,7 +643,7 @@ class SpiderFootFastApi:
             pageid="SCANLIST", docroot=self.docroot, version=__version__
         )
         return HTMLResponse(content=content)
-    
+
     async def render_scaninfo(self, request: Request, id: str) -> HTMLResponse:
         """Information about a selected scan.
 
@@ -651,7 +657,8 @@ class SpiderFootFastApi:
         res = dbh.scanInstanceGet(id)
         if res is None:
             return HTMLResponse(
-                content=self.error_html("Scan ID not found.").body.decode('utf-8')
+                content=self.error_html(
+                    "Scan ID not found.").body.decode('utf-8')
             )
 
         templ = Template(
@@ -668,7 +675,7 @@ class SpiderFootFastApi:
             pageid="SCANLIST",
         )
         return HTMLResponse(content=content)
-    
+
     async def render_newscan(self, request: Request) -> HTMLResponse:
         """Configure a new scan.
 
@@ -691,7 +698,7 @@ class SpiderFootFastApi:
             version=__version__,
         )
         return HTMLResponse(content=content)
-    
+
     async def render_clonescan(self, request: Request, id: str) -> HTMLResponse:
         """Clone an existing scan (pre-selected options in the newscan page).
 
@@ -707,7 +714,8 @@ class SpiderFootFastApi:
 
         if not info:
             return HTMLResponse(
-                content=self.error_html("Invalid scan ID.").body.decode('utf-8')
+                content=self.error_html(
+                    "Invalid scan ID.").body.decode('utf-8')
             )
 
         scanconfig = dbh.scanConfigGet(id)
@@ -716,7 +724,8 @@ class SpiderFootFastApi:
 
         if scanname == "" or scantarget == "" or len(scanconfig) == 0:
             return HTMLResponse(
-                content=self.error_html("Something went wrong internally.").body.decode('utf-8')
+                content=self.error_html(
+                    "Something went wrong internally.").body.decode('utf-8')
             )
 
         targetType = SpiderFootHelpers.targetTypeFromString(scantarget)
@@ -740,7 +749,7 @@ class SpiderFootFastApi:
             version=__version__,
         )
         return HTMLResponse(content=content)
-    
+
     async def render_opts(self, request: Request, updated: Optional[str] = None) -> HTMLResponse:
         """Show module and global settings page.
 
@@ -762,7 +771,7 @@ class SpiderFootFastApi:
             docroot=self.docroot,
         )
         return HTMLResponse(content=content)
-    
+
     # File export methods
     async def export_scanexportlogs(self, id: str, dialect: str = "excel") -> Response:
         """Get scan log.
@@ -780,12 +789,14 @@ class SpiderFootFastApi:
             data = dbh.scanLogs(id, None, None, True)
         except Exception:
             return HTMLResponse(
-                content=self.error_html("Scan ID not found.").body.decode('utf-8')
+                content=self.error_html(
+                    "Scan ID not found.").body.decode('utf-8')
             )
 
         if not data:
             return HTMLResponse(
-                content=self.error_html("Scan ID not found.").body.decode('utf-8')
+                content=self.error_html(
+                    "Scan ID not found.").body.decode('utf-8')
             )
 
         fileobj = StringIO()
@@ -808,12 +819,12 @@ class SpiderFootFastApi:
             "Content-Type": "application/csv",
             "Pragma": "no-cache"
         }
-        
+
         return Response(
-            content=fileobj.getvalue().encode("utf-8"), 
+            content=fileobj.getvalue().encode("utf-8"),
             headers=headers
         )
-    
+
     async def export_scaneventresult(
         self,
         id: str,
@@ -860,7 +871,7 @@ class SpiderFootFastApi:
                 "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Pragma": "no-cache"
             }
-            
+
             return Response(
                 content=self.buildExcel(
                     rows,
@@ -898,16 +909,17 @@ class SpiderFootFastApi:
                 "Content-Type": "application/csv",
                 "Pragma": "no-cache"
             }
-            
+
             return Response(
                 content=fileobj.getvalue().encode("utf-8"),
                 headers=headers
             )
 
         return HTMLResponse(
-            content=self.error_html("Invalid export filetype.").body.decode('utf-8')
+            content=self.error_html(
+                "Invalid export filetype.").body.decode('utf-8')
         )
-    
+
     async def export_scanviz(self, id: str, gexf: str = "0") -> Response:
         """Export entities from scan results for visualising.
 
@@ -944,12 +956,13 @@ class SpiderFootFastApi:
             "Content-Type": "application/gexf",
             "Pragma": "no-cache"
         }
-        
+
         return Response(
-            content=SpiderFootHelpers.buildGraphGexf([root], "SpiderFoot Export", data),
+            content=SpiderFootHelpers.buildGraphGexf(
+                [root], "SpiderFoot Export", data),
             headers=headers
         )
-    
+
     async def export_scanvizmulti(self, ids: str, gexf: str = "1") -> Response:
         """Export entities results from multiple scans in GEXF format.
 
@@ -993,12 +1006,13 @@ class SpiderFootFastApi:
             "Content-Type": "application/gexf",
             "Pragma": "no-cache"
         }
-        
+
         return Response(
-            content=SpiderFootHelpers.buildGraphGexf(roots, "SpiderFoot Export", data),
+            content=SpiderFootHelpers.buildGraphGexf(
+                roots, "SpiderFoot Export", data),
             headers=headers
         )
-    
+
     # Settings management
     async def save_settings(
         self,
@@ -1018,7 +1032,8 @@ class SpiderFootFastApi:
         """
         if str(token) != str(self.token):
             return HTMLResponse(
-                content=self.error_html(f"Invalid token ({token})").body.decode('utf-8')
+                content=self.error_html(
+                    f"Invalid token ({token})").body.decode('utf-8')
             )
 
         # configFile seems to get set even if a file isn't uploaded
@@ -1053,7 +1068,8 @@ class SpiderFootFastApi:
             if self.reset_settings():
                 return RedirectResponse(f"{self.docroot}/opts?updated=1", status_code=303)
             return HTMLResponse(
-                content=self.error_html("Failed to reset settings").body.decode('utf-8')
+                content=self.error_html(
+                    "Failed to reset settings").body.decode('utf-8')
             )
 
         # Save settings
@@ -1073,11 +1089,12 @@ class SpiderFootFastApi:
             dbh.configSet(sf.configSerialize(self.config))
         except Exception as e:
             return HTMLResponse(
-                content=self.error_html(f"Processing one or more of your inputs failed: {e}").body.decode('utf-8')
+                content=self.error_html(
+                    f"Processing one or more of your inputs failed: {e}").body.decode('utf-8')
             )
 
         return RedirectResponse(f"{self.docroot}/opts?updated=1", status_code=303)
-    
+
     def reset_settings(self) -> bool:
         """Reset settings to default.
 
@@ -1106,14 +1123,16 @@ class SpiderFootFastApi:
             filename="spiderfoot/templates/error.tmpl", lookup=self.lookup)
         return HTMLResponse(
             content=templ.render(
-                message=message, 
-                docroot=self.docroot, 
+                message=message,
+                docroot=self.docroot,
                 version=__version__
             )
         )
 
+
 # Global instance initialization
 sf_api_instance = None
+
 
 def initialize_sf_api(web_config: dict, config: dict):
     """Initialize the global SpiderFootFastApi instance.
@@ -1124,16 +1143,19 @@ def initialize_sf_api(web_config: dict, config: dict):
     """
     global sf_api_instance
     sf_api_instance = SpiderFootFastApi(web_config, config)
-    
+
     # Set up utilities
-    setup_logging(app, log_level=logging.DEBUG if config.get("_debug") else logging.INFO)
+    setup_logging(app, log_level=logging.DEBUG if config.get(
+        "_debug") else logging.INFO)
     setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
     setup_cors(
-        app, 
-        allowed_origins=web_config.get("cors", ["http://127.0.0.1", "http://localhost"])
+        app,
+        allowed_origins=web_config.get(
+            "cors", ["http://127.0.0.1", "http://localhost"])
     )
-    
+
     return sf_api_instance
+
 
 def get_sf_api():
     """FastAPI dependency to get the SpiderFootFastApi instance.
@@ -1142,10 +1164,13 @@ def get_sf_api():
         SpiderFootFastApi: The global SpiderFootFastApi instance
     """
     if sf_api_instance is None:
-        raise HTTPException(status_code=500, detail="SpiderFoot API not initialized")
+        raise HTTPException(
+            status_code=500, detail="SpiderFoot API not initialized")
     return sf_api_instance
 
 # API Key dependency
+
+
 def get_api_auth(api_key: str = Security(APIKeyHeader(name="X-API-Key"))):
     """FastAPI dependency to check API key authentication.
 
@@ -1161,6 +1186,8 @@ def get_api_auth(api_key: str = Security(APIKeyHeader(name="X-API-Key"))):
     return True
 
 # FastAPI route definitions
+
+
 @app.get("/eventtypes", response_model=List[List[str]])
 async def eventtypes(
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
@@ -1172,6 +1199,7 @@ async def eventtypes(
         list: list of event types
     """
     return await sf_api.get_eventtypes()
+
 
 @app.get("/modules", response_model=List[Dict[str, str]])
 async def modules(
@@ -1185,6 +1213,7 @@ async def modules(
     """
     return await sf_api.get_modules()
 
+
 @app.get("/correlationrules", response_model=List[Dict[str, Any]])
 async def correlationrules(
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
@@ -1196,6 +1225,7 @@ async def correlationrules(
         list: list of correlation rules
     """
     return await sf_api.get_correlationrules()
+
 
 @app.get("/ping", response_model=List[str])
 async def ping(
@@ -1209,9 +1239,10 @@ async def ping(
     """
     return await sf_api.do_ping()
 
+
 @app.get("/query")
 async def query(
-    query: str, 
+    query: str,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1225,9 +1256,10 @@ async def query(
     """
     return await sf_api.do_query(query)
 
+
 @app.get("/search")
 async def search(
-    id: Optional[str] = None, 
+    id: Optional[str] = None,
     eventType: Optional[str] = None,
     value: Optional[str] = None,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
@@ -1245,9 +1277,10 @@ async def search(
     """
     return await sf_api.search_data(id, eventType, value)
 
+
 @app.get("/scanhistory")
 async def scanhistory(
-    id: str, 
+    id: str,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1261,6 +1294,7 @@ async def scanhistory(
     """
     return await sf_api.get_scanhistory(id)
 
+
 @app.get("/scanlist", response_model=List[List[Any]])
 async def scanlist(
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
@@ -1272,6 +1306,7 @@ async def scanlist(
         List[List]: List of scans with details
     """
     return await sf_api.get_scanlist()
+
 
 @app.get("/scanstatus")
 async def scanstatus(
@@ -1289,6 +1324,7 @@ async def scanstatus(
     """
     return await sf_api.get_scanstatus(id)
 
+
 @app.delete("/scandelete")
 async def scandelete(
     id: str,
@@ -1305,6 +1341,7 @@ async def scandelete(
     """
     return await sf_api.delete_scan(id)
 
+
 @app.post("/stopscan")
 async def stopscan(
     id: str,
@@ -1320,6 +1357,7 @@ async def stopscan(
         Dict: Status message
     """
     return await sf_api.stop_scan(id)
+
 
 @app.post("/startscan")
 async def startscan(
@@ -1345,9 +1383,10 @@ async def startscan(
     """
     return await sf_api.start_scan(scanname, scantarget, modulelist, typelist, usecase)
 
+
 @app.get("/", response_class=HTMLResponse)
 async def index(
-    request: Request, 
+    request: Request,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1358,10 +1397,11 @@ async def index(
     """
     return await sf_api.render_index(request)
 
+
 @app.get("/scaninfo", response_class=HTMLResponse)
 async def scaninfo(
-    request: Request, 
-    id: str, 
+    request: Request,
+    id: str,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1375,9 +1415,10 @@ async def scaninfo(
     """
     return await sf_api.render_scaninfo(request, id)
 
+
 @app.get("/newscan", response_class=HTMLResponse)
 async def newscan(
-    request: Request, 
+    request: Request,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1388,10 +1429,11 @@ async def newscan(
     """
     return await sf_api.render_newscan(request)
 
+
 @app.get("/clonescan", response_class=HTMLResponse)
 async def clonescan(
-    request: Request, 
-    id: str, 
+    request: Request,
+    id: str,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1405,10 +1447,11 @@ async def clonescan(
     """
     return await sf_api.render_clonescan(request, id)
 
+
 @app.get("/opts", response_class=HTMLResponse)
 async def opts(
-    request: Request, 
-    updated: Optional[str] = None, 
+    request: Request,
+    updated: Optional[str] = None,
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1422,10 +1465,11 @@ async def opts(
     """
     return await sf_api.render_opts(request, updated)
 
+
 @app.get("/scanexportlogs")
 async def scanexportlogs(
-    id: str, 
-    dialect: str = "excel", 
+    id: str,
+    dialect: str = "excel",
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1439,6 +1483,7 @@ async def scanexportlogs(
         Response: scan logs in CSV format
     """
     return await sf_api.export_scanexportlogs(id, dialect)
+
 
 @app.get("/scaneventresultexport")
 async def scaneventresultexport(
@@ -1462,10 +1507,11 @@ async def scaneventresultexport(
     """
     return await sf_api.export_scaneventresult(id, type, filetype, dialect)
 
+
 @app.get("/scanviz")
 async def scanviz(
-    id: str, 
-    gexf: str = "0", 
+    id: str,
+    gexf: str = "0",
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1480,10 +1526,11 @@ async def scanviz(
     """
     return await sf_api.export_scanviz(id, gexf)
 
+
 @app.get("/scanvizmulti")
 async def scanvizmulti(
-    ids: str, 
-    gexf: str = "1", 
+    ids: str,
+    gexf: str = "1",
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
@@ -1497,6 +1544,7 @@ async def scanvizmulti(
         Response: Visualization data
     """
     return await sf_api.export_scanvizmulti(ids, gexf)
+
 
 @app.post("/savesettings")
 async def savesettings(
@@ -1520,6 +1568,8 @@ async def savesettings(
     return await sf_api.save_settings(allopts, token, configFile)
 
 # Add a main function to set up the app with SpiderFoot config
+
+
 def setup_app(web_config: dict, config: dict):
     """Set up the FastAPI application with SpiderFoot config.
 
@@ -1528,19 +1578,20 @@ def setup_app(web_config: dict, config: dict):
         config (dict): SpiderFoot configuration
     """
     initialize_sf_api(web_config, config)
-    
+
     # Mount static files
     app.mount("/static", StaticFiles(directory="spiderfoot/static"), name="static")
-    
+
     # Add application startup and shutdown events
     @app.on_event("startup")
     async def startup_event():
         logger = get_logger("spiderfoot.app")
-        logger.info(f"Starting SpiderFoot FastAPI server version {__version__}")
-    
+        logger.info(
+            f"Starting SpiderFoot FastAPI server version {__version__}")
+
     @app.on_event("shutdown")
     async def shutdown_event():
         logger = get_logger("spiderfoot.app")
         logger.info("Shutting down SpiderFoot FastAPI server")
-    
+
     return app

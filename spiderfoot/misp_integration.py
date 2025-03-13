@@ -53,7 +53,7 @@ class MispAttribute:
         self.sharing_group_id = sharing_group_id
         self.timestamp = timestamp or int(time.time())
         self.uuid = kwargs.get('uuid', str(uuid.uuid4()))
-        
+
         # Additional MISP properties
         self.additional_properties = kwargs
 
@@ -69,26 +69,26 @@ class MispAttribute:
             "uuid": self.uuid,
             "timestamp": self.timestamp
         }
-        
+
         if self.category:
             attr_dict["category"] = self.category
-        
+
         attr_dict["to_ids"] = self.to_ids
-        
+
         if self.comment:
             attr_dict["comment"] = self.comment
-            
+
         if self.distribution is not None:
             attr_dict["distribution"] = self.distribution
-            
+
         if self.sharing_group_id:
             attr_dict["sharing_group_id"] = self.sharing_group_id
-            
+
         # Add any additional properties
         for k, v in self.additional_properties.items():
             if k not in attr_dict and k != "uuid":
                 attr_dict[k] = v
-                
+
         return attr_dict
 
 
@@ -131,7 +131,7 @@ class MispObject:
         self.timestamp = timestamp or int(time.time())
         self.uuid = kwargs.get('uuid', str(uuid.uuid4()))
         self.attributes: List[MispAttribute] = []
-        
+
         # Additional MISP properties
         self.additional_properties = kwargs
 
@@ -155,30 +155,30 @@ class MispObject:
             "timestamp": self.timestamp,
             "Attribute": [attr.to_dict() for attr in self.attributes]
         }
-        
+
         if self.description:
             obj_dict["description"] = self.description
-            
+
         if self.template_uuid:
             obj_dict["template_uuid"] = self.template_uuid
-            
+
         if self.template_version:
             obj_dict["template_version"] = self.template_version
-            
+
         if self.meta:
             obj_dict["meta"] = self.meta
-            
+
         if self.distribution is not None:
             obj_dict["distribution"] = self.distribution
-            
+
         if self.sharing_group_id:
             obj_dict["sharing_group_id"] = self.sharing_group_id
-            
+
         # Add any additional properties
         for k, v in self.additional_properties.items():
             if k not in obj_dict and k != "uuid":
                 obj_dict[k] = v
-                
+
         return obj_dict
 
 
@@ -220,7 +220,7 @@ class MispEvent:
         self.attributes: List[MispAttribute] = []
         self.objects: List[MispObject] = []
         self.tags: List[str] = []
-        
+
         # Additional MISP properties
         self.additional_properties = kwargs
 
@@ -267,15 +267,15 @@ class MispEvent:
             "Object": [obj.to_dict() for obj in self.objects],
             "Tag": self.tags
         }
-        
+
         if self.sharing_group_id:
             event_dict["sharing_group_id"] = self.sharing_group_id
-            
+
         # Add any additional properties
         for k, v in self.additional_properties.items():
             if k not in event_dict and k != "uuid":
                 event_dict[k] = v
-                
+
         return event_dict
 
 
@@ -317,7 +317,7 @@ class MispTaxonomy:
         """
         if predicate not in self.predicates:
             self.add_predicate(predicate)
-            
+
         self.predicates[predicate]["values"][value] = {
             "description": description
         }
@@ -369,7 +369,8 @@ class MispIntegration:
         self.taxonomies["confidence"] = confidence
 
         # Load threat actor taxonomy
-        threat_actor = MispTaxonomy("threat-actor", "Threat Actor Classification")
+        threat_actor = MispTaxonomy(
+            "threat-actor", "Threat Actor Classification")
         threat_actor.add_predicate("type", "Threat Actor Type")
         threat_actor.add_entry("type", "apt", "Advanced Persistent Threat")
         threat_actor.add_entry("type", "criminal", "Criminal")
@@ -394,35 +395,36 @@ class MispIntegration:
             MispEvent: MISP event containing scan data
         """
         scan_info = self.db.scanInstanceGet(scan_id)
-        
+
         if not scan_info:
             self.log.error(f"Scan {scan_id} not found")
             return None
-            
+
         scan_name = scan_info[0]
         scan_target = scan_info[1]
-        
+
         misp_event = MispEvent(
             info=f"SpiderFoot Scan: {scan_name}",
             timestamp=int(scan_info[2])  # created timestamp
         )
-        
+
         # Add target as an attribute
         target_type = "domain" if "." in scan_target else "text"
         misp_event.add_attribute(
-            MispAttribute(type=target_type, value=scan_target, category="Payload delivery")
+            MispAttribute(type=target_type, value=scan_target,
+                          category="Payload delivery")
         )
-        
+
         # Get scan results and convert to MISP objects/attributes
         results = self.db.scanResultEvent(scan_id)
-        
+
         # Group results by type for better organization
         results_by_type = {}
         for result in results:
             if result[4] not in results_by_type:
                 results_by_type[result[4]] = []
             results_by_type[result[4]].append(result)
-            
+
         # Process results by type
         for event_type, events in results_by_type.items():
             # Create a MISP object for each event type
@@ -430,17 +432,17 @@ class MispIntegration:
                 name=f"sf-{event_type.lower().replace('_', '-')}",
                 description=f"SpiderFoot {event_type} findings"
             )
-            
+
             # Add events as attributes to the object
             for event in events:
                 event_data = event[1]
                 module = event[3]
                 confidence = event[5]
-                
+
                 # Map SpiderFoot event types to MISP attribute types
                 attr_type = self._map_sf_type_to_misp_type(event_type)
                 attr_category = self._map_sf_type_to_misp_category(event_type)
-                
+
                 # Create attribute
                 attr = MispAttribute(
                     type=attr_type,
@@ -449,13 +451,13 @@ class MispIntegration:
                     comment=f"Found by SpiderFoot module: {module}",
                     to_ids=confidence > 75  # Only high confidence items for IDS
                 )
-                
+
                 misp_obj.add_attribute(attr)
-                
+
             # Only add object if it has attributes
             if misp_obj.attributes:
                 misp_event.add_object(misp_obj)
-                
+
         return misp_event
 
     def _map_sf_type_to_misp_type(self, sf_type: str) -> str:
@@ -499,7 +501,7 @@ class MispIntegration:
             "PHYSICAL_COORDINATES": "geolocation",
             "PGP_KEY": "pgp-public-key",
         }
-        
+
         return mapping.get(sf_type, "text")
 
     def _map_sf_type_to_misp_category(self, sf_type: str) -> str:
@@ -547,7 +549,7 @@ class MispIntegration:
             "PROVIDER_DNS": "Support",
             "PROVIDER_MAIL": "Support",
         }
-        
+
         return mapping.get(sf_type, "Other")
 
     def convert_sf_event_to_misp_attribute(self, sf_event: SpiderFootEvent) -> MispAttribute:
@@ -561,12 +563,12 @@ class MispIntegration:
         """
         attr_type = self._map_sf_type_to_misp_type(sf_event.eventType)
         attr_category = self._map_sf_type_to_misp_category(sf_event.eventType)
-        
+
         # Add confidence as a tag if available
         tags = []
         if hasattr(sf_event, "tags") and sf_event.tags:
             tags = sf_event.tags
-        
+
         attr = MispAttribute(
             type=attr_type,
             value=sf_event.data,
@@ -576,13 +578,13 @@ class MispIntegration:
             timestamp=int(sf_event.generated),
             tags=tags
         )
-        
+
         # Add additional MISP attributes from event if available
         if hasattr(sf_event, "misp_attributes") and sf_event.misp_attributes:
             for k, v in sf_event.misp_attributes.items():
                 if not hasattr(attr, k):
                     setattr(attr, k, v)
-                
+
         return attr
 
     def export_misp_event(self, misp_event: MispEvent, format: str = "json") -> Union[str, Dict]:
@@ -596,12 +598,12 @@ class MispIntegration:
             Union[str, Dict]: Exported event
         """
         event_dict = misp_event.to_dict()
-        
+
         if format.lower() == "json":
             return json.dumps(event_dict, indent=2)
-            
+
         return event_dict
-        
+
     def save_misp_event(self, misp_event: MispEvent, scan_id: str) -> bool:
         """Save MISP event to the database.
 
@@ -618,21 +620,21 @@ class MispIntegration:
                 obj_dict = obj.to_dict()
                 obj_dict["scan_instance_id"] = scan_id
                 self.db.storeObject(obj, True)
-                
+
             # Store standalone attributes
             for attr in misp_event.attributes:
                 attr_dict = attr.to_dict()
                 attr_dict["scan_instance_id"] = scan_id
                 self.db.storeAttribute(attr, scan_id)
-                
+
             # Store event metadata
             event_dict = misp_event.to_dict()
             event_dict["scan_instance_id"] = scan_id
-            
+
             # Store tags
             for tag in misp_event.tags:
                 self.db.storeMispTag(tag, scan_id)
-                
+
             return True
         except Exception as e:
             self.log.error(f"Error saving MISP event: {e}")

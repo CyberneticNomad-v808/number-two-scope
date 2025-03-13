@@ -58,7 +58,7 @@ def get_sf_api() -> SpiderFootAPI:
     global _sf_api_instance
     if _sf_api_instance is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="SpiderFoot API not initialized"
         )
     return _sf_api_instance

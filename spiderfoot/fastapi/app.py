@@ -21,6 +21,7 @@ from spiderfoot.fastapi.dependencies import get_sf_api, initialize_sf_api
 # Import all routes to register them
 from spiderfoot.fastapi.routes import scan, search, config, ui, export
 
+
 def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI:
     """Create and configure a FastAPI application instance.
 
@@ -32,7 +33,7 @@ def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI
         FastAPI: Configured FastAPI application
     """
     app = FastAPI(
-        title="SpiderFoot API", 
+        title="SpiderFoot API",
         description="SpiderFoot OSINT Automation Tool API",
         version=__version__,
         docs_url="/api/docs",
@@ -47,11 +48,13 @@ def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI
     sf_api = initialize_sf_api(web_config, sf_config)
 
     # Set up utilities
-    setup_logging(app, log_level=logging.DEBUG if sf_config.get("_debug") else logging.INFO)
+    setup_logging(app, log_level=logging.DEBUG if sf_config.get(
+        "_debug") else logging.INFO)
     setup_error_handlers(app, html_error_template=sf_api.error_html)
     setup_cors(
-        app, 
-        allowed_origins=web_config.get("cors", ["http://127.0.0.1", "http://localhost"])
+        app,
+        allowed_origins=web_config.get(
+            "cors", ["http://127.0.0.1", "http://localhost"])
     )
 
     # Set up API key authentication if enabled
@@ -71,13 +74,14 @@ def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI
 
     # Mount static files
     app.mount("/static", StaticFiles(directory="spiderfoot/static"), name="static")
-    
+
     # Add application startup and shutdown events
     @app.on_event("startup")
     async def startup_event():
         logger = logging.getLogger("spiderfoot.app")
-        logger.info(f"Starting SpiderFoot FastAPI server version {__version__}")
-    
+        logger.info(
+            f"Starting SpiderFoot FastAPI server version {__version__}")
+
     @app.on_event("shutdown")
     async def shutdown_event():
         logger = logging.getLogger("spiderfoot.app")

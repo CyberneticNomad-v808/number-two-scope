@@ -13,6 +13,7 @@ from spiderfoot.fastapi.dependencies import get_sf_api, get_api_auth
 # Create router with API key dependency (optional for UI routes)
 router = APIRouter(tags=["UI"], dependencies=[Depends(get_api_auth)])
 
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, sf_api: SpiderFootAPI = Depends(get_sf_api)):
     """Show scan list page.
@@ -27,6 +28,7 @@ async def index(request: Request, sf_api: SpiderFootAPI = Depends(get_sf_api)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error rendering page: {str(e)}"
         )
+
 
 @router.get("/scaninfo", response_class=HTMLResponse)
 async def scan_info(request: Request, id: str, sf_api: SpiderFootAPI = Depends(get_sf_api)):
@@ -48,6 +50,7 @@ async def scan_info(request: Request, id: str, sf_api: SpiderFootAPI = Depends(g
             detail=f"Error rendering page: {str(e)}"
         )
 
+
 @router.get("/newscan", response_class=HTMLResponse)
 async def new_scan(request: Request, sf_api: SpiderFootAPI = Depends(get_sf_api)):
     """Show new scan configuration page.
@@ -66,6 +69,7 @@ async def new_scan(request: Request, sf_api: SpiderFootAPI = Depends(get_sf_api)
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error rendering page: {str(e)}"
         )
+
 
 @router.get("/clonescan", response_class=HTMLResponse)
 async def clone_scan(request: Request, id: str, sf_api: SpiderFootAPI = Depends(get_sf_api)):
@@ -87,9 +91,10 @@ async def clone_scan(request: Request, id: str, sf_api: SpiderFootAPI = Depends(
             detail=f"Error rendering page: {str(e)}"
         )
 
+
 @router.get("/opts", response_class=HTMLResponse)
 async def settings(
-    request: Request, 
+    request: Request,
     updated: Optional[str] = None,
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):

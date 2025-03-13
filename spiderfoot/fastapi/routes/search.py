@@ -10,11 +10,13 @@ from spiderfoot.fastapi.core import SpiderFootAPI
 from spiderfoot.fastapi.dependencies import get_sf_api, get_api_auth
 
 # Create router with API key dependency
-router = APIRouter(prefix="/search", tags=["Search"], dependencies=[Depends(get_api_auth)])
+router = APIRouter(
+    prefix="/search", tags=["Search"], dependencies=[Depends(get_api_auth)])
+
 
 @router.get("/", response_model=List[List[Any]])
 async def search(
-    id: Optional[str] = None, 
+    id: Optional[str] = None,
     eventType: Optional[str] = None,
     value: Optional[str] = None,
     sf_api: SpiderFootAPI = Depends(get_sf_api)
@@ -36,6 +38,7 @@ async def search(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search error: {str(e)}"
         )
+
 
 @router.get("/history", response_model=List[Any])
 async def get_scan_history(

@@ -30,9 +30,10 @@ from sfscan import startSpiderFootScanner
 from spiderfoot import SpiderFootDb, SpiderFootHelpers, __version__
 from spiderfoot.logger import logListenerSetup, logWorkerSetup
 
+
 class SpiderFootAPI:
     """SpiderFoot API core functionality."""
-    
+
     def __init__(
         self,
         web_config: Dict[str, Any],
@@ -56,24 +57,25 @@ class SpiderFootAPI:
             raise ValueError("config is empty")
 
         if not isinstance(web_config, dict):
-            raise TypeError(f"web_config is {type(web_config)}; expected dict()")
+            raise TypeError(
+                f"web_config is {type(web_config)}; expected dict()")
         if not config:
             raise ValueError("web_config is empty")
 
         self.docroot = web_config.get("root", "/").rstrip("/")
-        
+
         # Initialize configuration
         self._init_config(config)
-        
+
         # Initialize templates
         self.lookup = TemplateLookup(directories=[""])
-        
+
         # Set up logging
         self._init_logging(loggingQueue)
-        
+
         # Security setup
         self._init_security()
-        
+
         # Generate a token for CSRF protection
         self.token = None
 
@@ -87,7 +89,7 @@ class SpiderFootAPI:
         dbh = SpiderFootDb(self.defaultConfig, init=True)
         sf = SpiderFoot(self.defaultConfig)
         self.config = sf.configUnserialize(dbh.configGet(), self.defaultConfig)
-    
+
     def _init_logging(self, loggingQueue: Optional["mp.Queue"] = None) -> None:
         """Initialize logging.
 
@@ -101,7 +103,7 @@ class SpiderFootAPI:
             self.loggingQueue = loggingQueue
         logWorkerSetup(self.loggingQueue)
         self.log = logging.getLogger("spiderfoot.api.core")
-    
+
     def _init_security(self) -> None:
         """Initialize security settings."""
         self.csp = (
@@ -128,12 +130,12 @@ class SpiderFootAPI:
             filename="spiderfoot/templates/error.tmpl", lookup=self.lookup)
         return HTMLResponse(
             content=templ.render(
-                message=message, 
-                docroot=self.docroot, 
+                message=message,
+                docroot=self.docroot,
                 version=__version__
             )
         )
-    
+
     def cleanUserInput(self, inputList: List[str]) -> List[str]:
         """Convert data to HTML entities; except quotes and ampersands.
 
@@ -162,7 +164,7 @@ class SpiderFootAPI:
             ret.append(c)
 
         return ret
-    
+
     def reset_settings(self) -> bool:
         """Reset settings to default.
 
@@ -178,5 +180,5 @@ class SpiderFootAPI:
             return False
 
         return True
-    
+
     # Additional core methods would be defined here...

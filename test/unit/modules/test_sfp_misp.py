@@ -31,25 +31,25 @@ class TestModuleMisp(unittest.TestCase):
     def test_handleEvent(self):
         """Test handleEvent(self, sfEvent)"""
         module = sfp_misp()
-        
+
         module.setup(None, dict())
-        
+
         event_data = "example data"
         event_type = "ROOT"
         module_sfp = "sfp_test"
         source_event = ""
-        
+
         event = SpiderFootEvent(
             event_type,
             event_data,
             module_sfp,
             source_event
         )
-        
+
         # This event type should not be processed
         result = module.handleEvent(event)
         self.assertIsNone(result)
-        
+
         # Try with a non-ROOT event
         event_type = "DOMAIN_NAME"
         event = SpiderFootEvent(
@@ -58,7 +58,7 @@ class TestModuleMisp(unittest.TestCase):
             module_sfp,
             source_event
         )
-        
+
         # No MISP integration available so should return None
         result = module.handleEvent(event)
         self.assertIsNone(result)

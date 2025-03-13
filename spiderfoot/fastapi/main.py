@@ -36,15 +36,15 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         "/etc/spiderfoot.conf",
         "/usr/local/etc/spiderfoot.conf",
     ]
-    
+
     # Filter out None values
     config_paths = [p for p in config_paths if p]
-    
+
     # Try each path
     for path in config_paths:
         if os.path.isfile(path):
             return SpiderFoot.configSerialize(SpiderFoot.configUnserialize(path))
-    
+
     print("Error: No configuration file found.")
     print("Tried: " + ", ".join(config_paths))
     sys.exit(1)
@@ -69,10 +69,11 @@ def run_app(
     # Load SpiderFoot configuration
     sf_config = load_config(config_path)
     sf_config["_debug"] = debug
-    
+
     # Update with any additional options
-    sf_config.update({k: v for k, v in kwargs.items() if not k.startswith("_")})
-    
+    sf_config.update(
+        {k: v for k, v in kwargs.items() if not k.startswith("_")})
+
     # Web server configuration
     web_config = {
         "root": kwargs.get("root", "/"),
@@ -84,13 +85,13 @@ def run_app(
         "show_api_key": kwargs.get("show_api_key", False),
         "cors": kwargs.get("cors", ["http://127.0.0.1", "http://localhost"])
     }
-    
+
     # Create FastAPI application
     app = create_app(web_config, sf_config)
-    
+
     # Configure logging
     log_level = "debug" if debug else "info"
-    
+
     # Run the application
     uvicorn.run(
         app,
@@ -104,23 +105,29 @@ def run_app(
 def main() -> None:
     """Main entry point."""
     import argparse
-    
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description=f"SpiderFoot {__version__}")
-    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
-    parser.add_argument("-p", "--port", type=int, default=5001, help="Listen port (default: 5001)")
-    parser.add_argument("-l", "--listen", default="127.0.0.1", help="Listen IP (default: 127.0.0.1)")
+    parser.add_argument("-d", "--debug", action="store_true",
+                        help="Enable debug output")
+    parser.add_argument("-p", "--port", type=int, default=5001,
+                        help="Listen port (default: 5001)")
+    parser.add_argument("-l", "--listen", default="127.0.0.1",
+                        help="Listen IP (default: 127.0.0.1)")
     parser.add_argument("-c", "--config", help="Path to configuration file")
-    parser.add_argument("-k", "--api-key-auth", action="store_true", help="Enable API key authentication")
-    parser.add_argument("--show-api-key", action="store_true", help="Show API key on startup")
-    parser.add_argument("--cors", help="CORS allowed origins (comma-separated)")
+    parser.add_argument("-k", "--api-key-auth", action="store_true",
+                        help="Enable API key authentication")
+    parser.add_argument("--show-api-key", action="store_true",
+                        help="Show API key on startup")
+    parser.add_argument(
+        "--cors", help="CORS allowed origins (comma-separated)")
     args = parser.parse_args()
-    
+
     # Parse CORS origins
     cors = None
     if args.cors:
         cors = args.cors.split(",")
-    
+
     # Run the application
     run_app(
         host=args.listen,

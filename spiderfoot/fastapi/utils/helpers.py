@@ -11,6 +11,7 @@ import uuid
 from typing import Dict, Any, List, Optional, Union, Tuple
 from datetime import datetime
 
+
 def generate_unique_id() -> str:
     """Generate a unique ID.
 
@@ -18,6 +19,7 @@ def generate_unique_id() -> str:
         Unique ID string
     """
     return str(uuid.uuid4())
+
 
 def format_timestamp(timestamp: Union[int, float]) -> str:
     """Format a Unix timestamp to a human-readable string.
@@ -31,8 +33,9 @@ def format_timestamp(timestamp: Union[int, float]) -> str:
     # Handle None or 0 (not started/ended yet)
     if not timestamp:
         return "Not yet"
-    
+
     return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+
 
 def sanitize_input(input_str: str) -> str:
     """Sanitize user input to prevent XSS and injection attacks.
@@ -45,11 +48,12 @@ def sanitize_input(input_str: str) -> str:
     """
     if not input_str:
         return ""
-    
+
     # Replace potentially harmful characters
     sanitized = input_str.replace("<", "&lt;").replace(">", "&gt;")
-    
+
     return sanitized
+
 
 def parse_comma_separated_list(input_str: str) -> List[str]:
     """Parse a comma-separated string into a list.
@@ -62,8 +66,9 @@ def parse_comma_separated_list(input_str: str) -> List[str]:
     """
     if not input_str:
         return []
-    
+
     return [item.strip() for item in input_str.split(",") if item.strip()]
+
 
 def is_valid_target(target: str) -> bool:
     """Check if a target is valid.
@@ -77,16 +82,17 @@ def is_valid_target(target: str) -> bool:
     # Simple check - should be expanded based on SpiderFoot's actual rules
     if not target:
         return False
-    
+
     # Remove quotes if present
     if target.startswith('"') and target.endswith('"'):
         target = target[1:-1]
-    
+
     # Must have at least one character
     if len(target) < 1:
         return False
-    
+
     return True
+
 
 def build_pagination_links(
     current_page: int,
@@ -109,8 +115,9 @@ def build_pagination_links(
         "prev": f"{base_url}?page={current_page - 1}" if current_page > 1 else None,
         "next": f"{base_url}?page={current_page + 1}" if current_page < total_pages else None
     }
-    
+
     return links
+
 
 def calculate_scan_duration(
     start_time: Union[int, float],
@@ -127,23 +134,24 @@ def calculate_scan_duration(
     """
     if not start_time:
         return "Not started"
-    
+
     # If end time is not provided or is 0, use current time
     if not end_time:
         end_time = time.time()
-    
+
     duration_seconds = end_time - start_time
-    
+
     # Format duration
     hours, remainder = divmod(duration_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    
+
     if hours > 0:
         return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
     elif minutes > 0:
         return f"{int(minutes)}m {int(seconds)}s"
     else:
         return f"{int(seconds)}s"
+
 
 def get_file_extension(filename: str) -> str:
     """Get file extension from filename.
@@ -156,5 +164,5 @@ def get_file_extension(filename: str) -> str:
     """
     if not filename or "." not in filename:
         return ""
-    
+
     return filename.split(".")[-1].lower()

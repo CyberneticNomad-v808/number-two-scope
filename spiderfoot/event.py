@@ -128,7 +128,7 @@ class SpiderFootEvent:
             self.sourceEventHash = sourceEvent.hash
             # Keep track of the source module by combining the event's module and source_module values
             self.actualSource = f"{sourceEvent.module}"
-            
+
             # Inherit tags from source event
             if hasattr(sourceEvent, 'tags'):
                 self.tags = sourceEvent.tags.copy()
@@ -204,7 +204,7 @@ class SpiderFootEvent:
             str: MISP attribute type
         """
         from spiderfoot.misp_integration import MispIntegration
-        
+
         mapping = MispIntegration.get_misp_type_mapping()
         return mapping.get(self.eventType, "text")
 
@@ -226,17 +226,17 @@ class SpiderFootEvent:
             "actualSource": self.actualSource,
             "generated": self.generated,
         }
-        
+
         # Add MISP attributes if present
         if hasattr(self, 'tags') and self.tags:
             event_dict["tags"] = self.tags
-            
+
         if hasattr(self, 'misp_category') and self.misp_category:
             event_dict["misp_category"] = self.misp_category
-            
+
         if hasattr(self, 'misp_attributes') and self.misp_attributes:
             event_dict["misp_attributes"] = self.misp_attributes
-            
+
         return event_dict
 
     def __str__(self) -> str:

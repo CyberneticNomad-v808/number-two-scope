@@ -11,7 +11,9 @@ from spiderfoot.fastapi.app import create_app
 from spiderfoot.fastapi.main import run_app, load_config
 from spiderfoot.fastapi.core import SpiderFootAPI
 
-__all__ = ["create_app", "run_app", "load_config", "SpiderFootAPI", "create_server"]
+__all__ = ["create_app", "run_app", "load_config",
+           "SpiderFootAPI", "create_server"]
+
 
 def create_server(
     host: str = "127.0.0.1",
@@ -40,7 +42,7 @@ def create_server(
     api_key_opts = {}
     if enable_api_key:
         api_key_opts["api_key_auth"] = True
-    
+
     # Run the app
     run_app(
         host=host,

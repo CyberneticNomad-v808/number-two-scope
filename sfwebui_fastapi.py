@@ -1146,7 +1146,7 @@ def initialize_sf_api(web_config: dict, config: dict):
         config (dict): SpiderFoot configuration
     """
     global sf_api_instance
-    
+
     try:
         # Ensure minimal config structure exists
         if "__modules__" not in config:
@@ -1159,7 +1159,7 @@ def initialize_sf_api(web_config: dict, config: dict):
                     config["__modules__"][modname]["opts"] = {}
                 if "optdescs" not in config["__modules__"][modname]:
                     config["__modules__"][modname]["optdescs"] = {}
-        
+
         sf_api_instance = SpiderFootFastApi(web_config, config)
     except Exception as e:
         print(f"Error initializing SpiderFootFastApi: {e}")
@@ -1169,7 +1169,7 @@ def initialize_sf_api(web_config: dict, config: dict):
             "_debug": config.get("_debug", False)
         }
         minimal_config.update(load_default_modules())
-        
+
         print("Falling back to minimal configuration...")
         sf_api_instance = SpiderFootFastApi(web_config, minimal_config)
 
@@ -1177,7 +1177,8 @@ def initialize_sf_api(web_config: dict, config: dict):
     try:
         # Modified setup_logging call to pass debug flag instead of log_level
         setup_logging(app, debug=config.get("_debug", False))
-        setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
+        setup_error_handlers(
+            app, html_error_template=sf_api_instance.error_html)
         setup_cors(
             app,
             allowed_origins=web_config.get(
@@ -1610,30 +1611,31 @@ def find_static_dir():
         str: Path to static files directory
     """
     import os
-    
+
     # Check possible static file locations in order of preference
     possible_static_dirs = [
         "static",                       # Root directory static folder
         "spiderfoot/static",            # Default in-package location
         "ui/static",                    # Possible alternative location
         "/usr/local/lib/spiderfoot/static",  # Common system install location
-        "/usr/share/spiderfoot/static", # Another system install location
-        os.path.join(os.path.dirname(__file__), "static")  # Relative to this file
+        "/usr/share/spiderfoot/static",  # Another system install location
+        # Relative to this file
+        os.path.join(os.path.dirname(__file__), "static")
     ]
-    
+
     # Try to find static directory that actually exists
     for static_dir in possible_static_dirs:
         if os.path.isdir(static_dir):
             print(f"Found static directory at: {static_dir}")
             return static_dir
-    
+
     # If no static directory is found, create a minimal one
     print("No static directory found. Creating a minimal static directory...")
     os.makedirs("./static", exist_ok=True)
     os.makedirs("./static/css", exist_ok=True)
     os.makedirs("./static/js", exist_ok=True)
     os.makedirs("./static/img", exist_ok=True)
-    
+
     # Create a minimal CSS file so the UI is somewhat usable
     with open("./static/css/spiderfoot.css", "w") as f:
         f.write("""
@@ -1643,7 +1645,7 @@ def find_static_dir():
         table, th, td { border: 1px solid #ddd; padding: 8px; }
         th { background-color: #f2f2f2; }
         """)
-    
+
     return "./static"
 
 
@@ -1729,16 +1731,16 @@ def load_default_modules():
     import json
     import glob
     from spiderfoot import SpiderFootHelpers
-    
+
     # Default empty dictionaries
     modules = {}
     correlationrules = []
-    
+
     # Try to load modules from directories
     module_directory = os.path.join('modules')
     if not os.path.isdir(module_directory):
         module_directory = os.path.join('spiderfoot', 'modules')
-    
+
     if os.path.isdir(module_directory):
         module_paths = glob.glob(os.path.join(module_directory, "sfp_*.py"))
         if module_paths:
@@ -1756,7 +1758,7 @@ def load_default_modules():
                     "opts": {},  # Add required opts dictionary - this was missing
                     "optdescs": {}  # Add descriptions for options
                 }
-    
+
     # Create a minimal set of essential modules if none found
     if not modules:
         print("No modules found. Adding minimal essential modules.")
@@ -1772,12 +1774,12 @@ def load_default_modules():
                 "optdescs": {}
             }
         }
-    
+
     # Try to load correlation rules
     rules_directory = os.path.join('correlations')
     if not os.path.isdir(rules_directory):
         rules_directory = os.path.join('spiderfoot', 'correlations')
-    
+
     if os.path.isdir(rules_directory):
         rule_files = glob.glob(os.path.join(rules_directory, "*.yaml"))
         if rule_files:
@@ -1791,11 +1793,12 @@ def load_default_modules():
                         "risk": "INFO"
                     }
                 })
-    
+
     return {
         "__modules__": modules,
         "__correlationrules__": correlationrules
     }
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SpiderFoot Web UI")
@@ -1846,7 +1849,7 @@ if __name__ == "__main__":
         '__database': db_path,      # Set default database path
         '_debug': args.debug,       # Pass debug flag to configuration
     }
-    
+
     # Add default modules configuration
     defaultConfig.update(load_default_modules())
 
@@ -1861,7 +1864,7 @@ if __name__ == "__main__":
         print(f"Database initialization error: {e}")
         print("Using default configuration instead.")
         config = defaultConfig
-    
+
     # Ensure required configuration keys exist
     if "__modules__" not in config:
         print("Warning: Modules configuration missing, using defaults")

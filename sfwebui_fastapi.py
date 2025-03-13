@@ -1146,14 +1146,38 @@ def initialize_sf_api(web_config: dict, config: dict):
         config (dict): SpiderFoot configuration
     """
     global sf_api_instance
-    sf_api_instance = SpiderFootFastApi(web_config, config)
+    
+    try:
+        # Ensure minimal config structure exists
+        if "__modules__" not in config:
+            print("Warning: Modules configuration missing, using defaults")
+            config.update(load_default_modules())
+        else:
+            # Make sure all modules have the required opts field
+            for modname in config["__modules__"]:
+                if "opts" not in config["__modules__"][modname]:
+                    config["__modules__"][modname]["opts"] = {}
+                if "optdescs" not in config["__modules__"][modname]:
+                    config["__modules__"][modname]["optdescs"] = {}
+        
+        sf_api_instance = SpiderFootFastApi(web_config, config)
+    except Exception as e:
+        print(f"Error initializing SpiderFootFastApi: {e}")
+        # Create a minimal configuration
+        minimal_config = {
+            "__database": config.get("__database", "spiderfoot.db"),
+            "_debug": config.get("_debug", False)
+        }
+        minimal_config.update(load_default_modules())
+        
+        print("Falling back to minimal configuration...")
+        sf_api_instance = SpiderFootFastApi(web_config, minimal_config)
 
     # Set up utilities with error handling
     try:
         # Modified setup_logging call to pass debug flag instead of log_level
         setup_logging(app, debug=config.get("_debug", False))
-        setup_error_handlers(
-            app, html_error_template=sf_api_instance.error_html)
+        setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
         setup_cors(
             app,
             allowed_origins=web_config.get(
@@ -1728,8 +1752,26 @@ def load_default_modules():
                     "group": "default",
                     "enabled": True,
                     "consumes": [],
-                    "produces": []
+                    "produces": [],
+                    "opts": {},  # Add required opts dictionary - this was missing
+                    "optdescs": {}  # Add descriptions for options
                 }
+    
+    # Create a minimal set of essential modules if none found
+    if not modules:
+        print("No modules found. Adding minimal essential modules.")
+        modules = {
+            "sfp__stor_db": {
+                "name": "Storage",
+                "descr": "Storage module for SpiderFoot",
+                "group": "default",
+                "enabled": True,
+                "consumes": [],
+                "produces": [],
+                "opts": {},
+                "optdescs": {}
+            }
+        }
     
     # Try to load correlation rules
     rules_directory = os.path.join('correlations')

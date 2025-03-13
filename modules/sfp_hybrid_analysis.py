@@ -72,7 +72,7 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         return ["RAW_RIR_DATA", "INTERNET_NAME", "DOMAIN_NAME", "LINKED_URL_INTERNAL"]
 
     def queryDomain(self, qry):
-        """Query a domain
+        """Query a domain.
 
         Args:
             qry (str): domain
@@ -99,7 +99,7 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def queryHost(self, qry):
-        """Query a host
+        """Query a host.
 
         Args:
             qry (str): host
@@ -126,7 +126,7 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def queryHash(self, qry):
-        """Query a hash
+        """Query a hash.
 
         Args:
             qry (str): hash
@@ -153,7 +153,7 @@ class sfp_hybrid_analysis(SpiderFootPlugin):
         return self.parseApiResponse(res)
 
     def parseApiResponse(self, res: dict):
-        """Parse HTTP response from API
+        """Parse HTTP response from API.
 
         Args:
             res (dict): HTTP response from SpiderFoot.fetchUrl()

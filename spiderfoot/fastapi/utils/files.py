@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI File Utilities
+"""SpiderFoot FastAPI File Utilities.
 
-This module provides utilities for working with files in the FastAPI implementation.
+This module provides utilities for working with files in the FastAPI
+implementation.
 """
 
 import csv
@@ -22,13 +22,13 @@ def create_csv_response(
     dialect: str = "excel"
 ) -> Response:
     """Create a CSV response.
-    
+
     Args:
         data: Data rows
         filename: Output filename
         headers: CSV header row
         dialect: CSV dialect
-    
+
     Returns:
         Response with CSV data
     """
@@ -60,13 +60,13 @@ def create_excel_response(
     sheet_name_index: int = 0
 ) -> Response:
     """Create an Excel response.
-    
+
     Args:
         data: Data rows
         filename: Output filename
         headers: Excel header row
         sheet_name_index: Index of column to use for sheet names
-    
+
     Returns:
         Response with Excel data
     """
@@ -152,10 +152,10 @@ def create_excel_response(
 
 def process_uploaded_config_file(upload_file: UploadFile) -> Dict[str, str]:
     """Process an uploaded configuration file.
-    
+
     Args:
         upload_file: Uploaded file
-    
+
     Returns:
         Dictionary of configuration options
     """

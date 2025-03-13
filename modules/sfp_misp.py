@@ -66,7 +66,7 @@ class sfp_misp(SpiderFootPlugin):
     
     def setup(self, sfc, userOpts=dict()):
         """Set up the module.
-        
+
         Args:
             sfc (SpiderFoot): SpiderFoot object
             userOpts (dict): User-defined options
@@ -132,7 +132,7 @@ class sfp_misp(SpiderFootPlugin):
 
     def watchedEvents(self) -> List[str]:
         """Events this module watches for.
-        
+
         Returns:
             list: Event types to watch for
         """
@@ -140,7 +140,7 @@ class sfp_misp(SpiderFootPlugin):
 
     def producedEvents(self) -> List[str]:
         """Events produced by this module.
-        
+
         Returns:
             list: Event types produced
         """
@@ -148,7 +148,7 @@ class sfp_misp(SpiderFootPlugin):
 
     def handleEvent(self, sfEvent):
         """Handle events and convert to MISP format.
-        
+
         Args:
             sfEvent (SpiderFootEvent): SpiderFoot event
         """

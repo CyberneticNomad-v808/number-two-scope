@@ -8,7 +8,7 @@ log = get_module_logger(__name__)
 
 
 class ExampleModule(SpiderFootPlugin):
-    """Example module demonstrating proper logging"""
+    """Example module demonstrating proper logging."""
 
     # ...module code...
 

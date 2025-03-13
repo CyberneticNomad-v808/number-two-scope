@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Routes
+"""SpiderFoot FastAPI Routes.
 
 This package contains FastAPI route handlers organized by domain:
 - scan: Scan management routes

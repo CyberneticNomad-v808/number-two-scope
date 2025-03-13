@@ -1,7 +1,7 @@
-"""
-MISP Galaxy support for SpiderFoot.
+"""MISP Galaxy support for SpiderFoot.
 
-This module provides integration with MISP Galaxies to enhance threat intelligence.
+This module provides integration with MISP Galaxies to enhance threat
+intelligence.
 """
 
 import json

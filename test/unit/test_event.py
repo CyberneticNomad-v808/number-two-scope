@@ -39,7 +39,8 @@ class TestSpiderFootEvent(unittest.TestCase):
         self.assertEqual(event.sourceEvent, source_event)
 
     def test_init_with_custom_parameters(self):
-        """Test initializing event with custom confidence, visibility, and risk."""
+        """Test initializing event with custom confidence, visibility, and
+        risk."""
         event = SpiderFootEvent(
             "TEST", "test data", "test_module", confidence=50, visibility=75, risk=25
         )

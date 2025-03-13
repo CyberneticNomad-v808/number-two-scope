@@ -9,10 +9,11 @@
 # Copyright:  (c) poppopjmp
 # License:      MIT
 # -----------------------------------------------------------------
+"""This module provides compatibility shims to help transition from CherryPy to
+FastAPI.
 
-"""
-This module provides compatibility shims to help transition from CherryPy to FastAPI.
-It provides mock classes and functions that mimic CherryPy's behavior but delegate to FastAPI.
+It provides mock classes and functions that mimic CherryPy's behavior
+but delegate to FastAPI.
 """
 
 import sys

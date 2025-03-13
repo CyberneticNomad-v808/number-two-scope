@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Request Models
+"""SpiderFoot FastAPI Request Models.
 
 This module defines Pydantic models for API requests.
 """

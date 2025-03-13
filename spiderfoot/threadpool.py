@@ -1,5 +1,4 @@
-"""
-SpiderFoot thread pool module.
+"""SpiderFoot thread pool module.
 
 This module provides thread pooling capabilities for SpiderFoot modules
 to enable efficient parallel processing while maintaining control over
@@ -17,8 +16,8 @@ from spiderfoot.logconfig import get_module_logger
 class SpiderFootThreadPool:
     """Thread pool for SpiderFoot.
 
-    Manages a pool of worker threads to handle tasks efficiently
-    with better control over resource usage and error handling.
+    Manages a pool of worker threads to handle tasks efficiently with
+    better control over resource usage and error handling.
     """
 
     def __init__(self, max_workers: Optional[int] = None, name: str = "SpiderFoot"):

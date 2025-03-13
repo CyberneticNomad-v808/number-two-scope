@@ -1,8 +1,8 @@
-"""
-SpiderFoot error handling module.
+"""SpiderFoot error handling module.
 
-This module provides utilities for consistent error handling across the application.
-It centralizes error handling patterns and integrates with the logging system.
+This module provides utilities for consistent error handling across the
+application. It centralizes error handling patterns and integrates with
+the logging system.
 """
 
 import sys

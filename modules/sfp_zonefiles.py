@@ -72,7 +72,7 @@ class sfp_zonefiles(SpiderFootPlugin):
         ]
 
     def queryDomain(self, qry):
-        """Query a domain
+        """Query a domain.
 
         Args:
             qry (str): domain

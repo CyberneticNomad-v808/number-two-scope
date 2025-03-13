@@ -1,7 +1,8 @@
 """SpiderFoot MISP integration module.
 
-This module provides integration with the MISP data model, allowing SpiderFoot
-to use standardized threat intelligence formats and taxonomies.
+This module provides integration with the MISP data model, allowing
+SpiderFoot to use standardized threat intelligence formats and
+taxonomies.
 """
 
 import json
@@ -607,7 +608,7 @@ class MispIntegration:
         Args:
             misp_event: MISP event to save
             scan_id: Scan instance ID
-            
+
         Returns:
             bool: Success
         """

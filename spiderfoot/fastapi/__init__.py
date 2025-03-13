@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Implementation
+"""SpiderFoot FastAPI Implementation.
 
 This package provides a FastAPI-based web interface for SpiderFoot,
 replacing the legacy CherryPy implementation.

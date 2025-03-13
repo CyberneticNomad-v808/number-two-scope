@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-SpiderFoot MISP Export CLI
+"""SpiderFoot MISP Export CLI.
 
 This script allows you to export SpiderFoot scan results to MISP format.
 It can either generate a MISP-compatible JSON file or directly publish

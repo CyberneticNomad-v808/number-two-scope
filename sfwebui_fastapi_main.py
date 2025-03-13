@@ -10,11 +10,10 @@
 # Copyright:  (c) poppopjmp
 # License:      MIT
 # -----------------------------------------------------------------
-"""
-SpiderFoot FastAPI Main Script
+"""SpiderFoot FastAPI Main Script.
 
-This script serves as the main entry point for the SpiderFoot FastAPI web interface.
-It delegates to the refactored modular implementation.
+This script serves as the main entry point for the SpiderFoot FastAPI
+web interface. It delegates to the refactored modular implementation.
 """
 
 from spiderfoot.fastapi.main import main as fastapi_main

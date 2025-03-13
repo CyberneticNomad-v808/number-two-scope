@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-Script to update SpiderFoot module test files to use the new wrapper pattern.
-This script will modify test files to use the create_module_wrapper method
-from the SpiderFootModuleTestCase class.
+"""Script to update SpiderFoot module test files to use the new wrapper
+pattern. This script will modify test files to use the create_module_wrapper
+method from the SpiderFootModuleTestCase class.
 
 Enhanced version with better module detection and more robust handling.
 """
@@ -124,7 +123,8 @@ def extract_module_attributes(module_class):
 
 
 def format_python_dict(python_dict, indent=12):
-    """Format a Python dictionary for insertion into code with proper indentation."""
+    """Format a Python dictionary for insertion into code with proper
+    indentation."""
     if not python_dict:
         return ""
 
@@ -290,7 +290,8 @@ def update_test_file(file_path, dry_run=False, force=False):
 
 
 def camel_case_to_readable(name):
-    """Convert a camel case name to a more readable format with special handling."""
+    """Convert a camel case name to a more readable format with special
+    handling."""
     if not name:
         return ""
 

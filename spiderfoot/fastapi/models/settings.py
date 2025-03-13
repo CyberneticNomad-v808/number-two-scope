@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Settings Models
+"""SpiderFoot FastAPI Settings Models.
 
 This module defines models for API settings and configuration.
 """

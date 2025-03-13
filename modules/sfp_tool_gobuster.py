@@ -78,9 +78,7 @@ class sfp_tool_gobuster(SpiderFootPlugin):
         return ["URL_DIRECTORY", "URL_FILE"]
 
     def execute_command(self, cmd):
-        """
-        Execute an external command and return the output.
-        """
+        """Execute an external command and return the output."""
         self.debug(f"Executing command: {' '.join(cmd)}")
         output_file = tempfile.NamedTemporaryFile(mode="w+", delete=False)
         output_file.close()

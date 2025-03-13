@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Utilities
+"""SpiderFoot FastAPI Utilities.
 
 This package contains utilities for the FastAPI implementation:
 - logging.py: Enhanced logging functionality

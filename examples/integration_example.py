@@ -5,7 +5,7 @@ from spiderfoot.logger import logListenerSetup, logWorkerSetup
 
 
 def setup_logging_in_main_app():
-    """How to set up logging in the main SpiderFoot application"""
+    """How to set up logging in the main SpiderFoot application."""
     # Decide whether to use multiprocessing.Queue or queue.Queue based on your needs
     if your_app_uses_multiprocessing:
         log_queue = multiprocessing.Queue()
@@ -36,7 +36,7 @@ def setup_logging_in_main_app():
 
 
 def module_initialization(app_state):
-    """How modules should initialize logging"""
+    """How modules should initialize logging."""
     # Get the log queue from the application state
     log_queue = app_state["log_queue"]
 
@@ -49,7 +49,7 @@ def module_initialization(app_state):
 
 
 def application_shutdown(app_state):
-    """How to properly shut down logging"""
+    """How to properly shut down logging."""
     # Get the log listener from the application state
     log_listener = app_state["log_listener"]
     log = app_state["log"]

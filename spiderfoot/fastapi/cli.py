@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI CLI
+"""SpiderFoot FastAPI CLI.
 
-This module provides command-line integration for the SpiderFoot FastAPI implementation.
+This module provides command-line integration for the SpiderFoot FastAPI
+implementation.
 """
 
 import argparse
@@ -15,7 +15,7 @@ from spiderfoot.fastapi.main import run_app
 
 def parse_args() -> Tuple[argparse.Namespace, Dict[str, Any]]:
     """Parse command line arguments.
-    
+
     Returns:
         Tuple of parsed arguments and configuration options
     """

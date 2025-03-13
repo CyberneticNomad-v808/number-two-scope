@@ -146,11 +146,11 @@ class SpiderFootFastApi:
     # Utility methods for error handling, response formatting, etc.
     def error_response(self, message: str, status_code: int = 500) -> JSONResponse:
         """Return JSON error response.
-        
+
         Args:
             message (str): Error message
             status_code (int): HTTP status code
-            
+
         Returns:
             JSONResponse: JSON error response
         """
@@ -380,7 +380,8 @@ class SpiderFootFastApi:
         return retdata
     
     async def get_scanstatus(self, id: str) -> List[Any]:
-        """Show basic information about a scan, including status and number of each event type.
+        """Show basic information about a scan, including status and number of
+        each event type.
 
         Args:
             id (str): scan ID
@@ -764,7 +765,7 @@ class SpiderFootFastApi:
     
     # File export methods
     async def export_scanexportlogs(self, id: str, dialect: str = "excel") -> Response:
-        """Get scan log
+        """Get scan log.
 
         Args:
             id (str): scan ID
@@ -820,7 +821,7 @@ class SpiderFootFastApi:
         filetype: str = "csv",
         dialect: str = "excel",
     ) -> Response:
-        """Get scan event result data in CSV or Excel format
+        """Get scan event result data in CSV or Excel format.
 
         Args:
             id (str): scan ID
@@ -1115,8 +1116,8 @@ class SpiderFootFastApi:
 sf_api_instance = None
 
 def initialize_sf_api(web_config: dict, config: dict):
-    """Initialize the global SpiderFootFastApi instance
-    
+    """Initialize the global SpiderFootFastApi instance.
+
     Args:
         web_config (dict): Web interface configuration
         config (dict): SpiderFoot configuration
@@ -1135,8 +1136,8 @@ def initialize_sf_api(web_config: dict, config: dict):
     return sf_api_instance
 
 def get_sf_api():
-    """FastAPI dependency to get the SpiderFootFastApi instance
-    
+    """FastAPI dependency to get the SpiderFootFastApi instance.
+
     Returns:
         SpiderFootFastApi: The global SpiderFootFastApi instance
     """
@@ -1146,11 +1147,11 @@ def get_sf_api():
 
 # API Key dependency
 def get_api_auth(api_key: str = Security(APIKeyHeader(name="X-API-Key"))):
-    """FastAPI dependency to check API key authentication
-    
+    """FastAPI dependency to check API key authentication.
+
     Args:
         api_key (str): API key from header
-        
+
     Returns:
         bool: True if authentication successful
     """
@@ -1215,10 +1216,10 @@ async def query(
     _: bool = Depends(get_api_auth)
 ):
     """Run SQL queries against the database.
-    
+
     Args:
         query (str): SQL query string
-    
+
     Returns:
         Union[List[Dict], Dict]: Query results or error message
     """
@@ -1233,12 +1234,12 @@ async def search(
     _: bool = Depends(get_api_auth)
 ):
     """Search scans.
-    
+
     Args:
         id (str): Filter by scan ID
         eventType (str): Filter by event type
         value (str): Filter by value
-    
+
     Returns:
         List[List]: Search results
     """
@@ -1251,10 +1252,10 @@ async def scanhistory(
     _: bool = Depends(get_api_auth)
 ):
     """Get scan history.
-    
+
     Args:
         id (str): Scan ID
-    
+
     Returns:
         List: Scan history data
     """
@@ -1266,7 +1267,7 @@ async def scanlist(
     _: bool = Depends(get_api_auth)
 ):
     """Get a list of all scans.
-    
+
     Returns:
         List[List]: List of scans with details
     """
@@ -1279,10 +1280,10 @@ async def scanstatus(
     _: bool = Depends(get_api_auth)
 ):
     """Get scan status.
-    
+
     Args:
         id (str): Scan ID
-    
+
     Returns:
         List: Scan status information
     """
@@ -1295,10 +1296,10 @@ async def scandelete(
     _: bool = Depends(get_api_auth)
 ):
     """Delete one or more scans.
-    
+
     Args:
         id (str): Comma-separated list of scan IDs
-    
+
     Returns:
         Dict: Status message
     """
@@ -1311,10 +1312,10 @@ async def stopscan(
     _: bool = Depends(get_api_auth)
 ):
     """Stop one or more running scans.
-    
+
     Args:
         id (str): Comma-separated list of scan IDs
-    
+
     Returns:
         Dict: Status message
     """
@@ -1338,7 +1339,7 @@ async def startscan(
         modulelist (str, optional): Comma-separated list of modules
         typelist (str, optional): Comma-separated list of types
         usecase (str, optional): Use case (all, passive, investigate, footprint)
-    
+
     Returns:
         Dict: Status message with scan ID
     """
@@ -1428,7 +1429,7 @@ async def scanexportlogs(
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
-    """Get scan log
+    """Get scan log.
 
     Args:
         id (str): scan ID
@@ -1448,7 +1449,7 @@ async def scaneventresultexport(
     sf_api: SpiderFootFastApi = Depends(get_sf_api),
     _: bool = Depends(get_api_auth)
 ):
-    """Get scan event result data in CSV or Excel format
+    """Get scan event result data in CSV or Excel format.
 
     Args:
         id (str): scan ID
@@ -1520,8 +1521,8 @@ async def savesettings(
 
 # Add a main function to set up the app with SpiderFoot config
 def setup_app(web_config: dict, config: dict):
-    """Set up the FastAPI application with SpiderFoot config
-    
+    """Set up the FastAPI application with SpiderFoot config.
+
     Args:
         web_config (dict): Web interface configuration
         config (dict): SpiderFoot configuration

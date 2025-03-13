@@ -140,7 +140,8 @@ class TestSpiderFootErrorHandling(unittest.TestCase):
 
     @mock.patch("spiderfoot.error_handling.get_module_logger")
     def test_api_error_handler_decorator_failure(self, mock_get_logger):
-        """Test api_error_handler decorator with function that raises exception."""
+        """Test api_error_handler decorator with function that raises
+        exception."""
         mock_logger = mock.MagicMock()
         mock_get_logger.return_value = mock_logger
 
@@ -175,7 +176,8 @@ class TestSpiderFootErrorHandling(unittest.TestCase):
 
     @mock.patch("spiderfoot.error_handling.get_module_logger")
     def test_database_error_handler_decorator_failure(self, mock_get_logger):
-        """Test database_error_handler decorator with function that raises exception."""
+        """Test database_error_handler decorator with function that raises
+        exception."""
         mock_logger = mock.MagicMock()
         mock_get_logger.return_value = mock_logger
 

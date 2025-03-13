@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Security Tests
+"""SpiderFoot FastAPI Security Tests.
 
-This module contains unit tests for the SpiderFoot FastAPI security features.
+This module contains unit tests for the SpiderFoot FastAPI security
+features.
 """
 
 import unittest

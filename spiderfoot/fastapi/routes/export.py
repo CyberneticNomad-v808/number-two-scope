@@ -1,5 +1,4 @@
-"""
-SpiderFoot FastAPI Export Routes
+"""SpiderFoot FastAPI Export Routes.
 
 This module defines routes for exporting scan data.
 """
@@ -21,12 +20,12 @@ async def export_scan_logs(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export scan logs.
-    
+
     Args:
         id: Scan ID
         dialect: CSV dialect
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Response with CSV data
     """
@@ -49,14 +48,14 @@ async def export_scan_event_results(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export scan event results.
-    
+
     Args:
         id: Scan ID
         type: Event type
         filetype: Output file format (csv or excel)
         dialect: CSV dialect
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Response with exported data
     """
@@ -77,12 +76,12 @@ async def export_scan_visualization(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export scan visualization data.
-    
+
     Args:
         id: Scan ID
         gexf: Format flag (0=JSON, 1=GEXF)
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Response with visualization data
     """
@@ -103,12 +102,12 @@ async def export_multi_scan_visualization(
     sf_api: SpiderFootAPI = Depends(get_sf_api)
 ):
     """Export visualization for multiple scans.
-    
+
     Args:
         ids: Comma-separated scan IDs
         gexf: Format flag (0=JSON, 1=GEXF)
         sf_api: SpiderFoot API instance
-    
+
     Returns:
         Response with visualization data
     """

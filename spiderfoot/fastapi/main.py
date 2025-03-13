@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Main Module
+"""SpiderFoot FastAPI Main Module.
 
-This module provides the main entry point for the SpiderFoot FastAPI application.
+This module provides the main entry point for the SpiderFoot FastAPI
+application.
 """
 
 import logging
@@ -19,13 +19,13 @@ from sflib import SpiderFoot
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load SpiderFoot configuration.
-    
+
     Args:
         config_path: Path to configuration file
-    
+
     Returns:
         SpiderFoot configuration dictionary
-    
+
     Raises:
         SystemExit: If no configuration file could be found
     """
@@ -58,7 +58,7 @@ def run_app(
     **kwargs
 ) -> None:
     """Run the FastAPI application.
-    
+
     Args:
         host: Host to listen on
         port: Port to listen on

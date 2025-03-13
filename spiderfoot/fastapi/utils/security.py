@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Security Utilities
+"""SpiderFoot FastAPI Security Utilities.
 
-This module provides security-related utilities for the FastAPI implementation.
+This module provides security-related utilities for the FastAPI
+implementation.
 """
 
 import random
@@ -18,10 +18,10 @@ logger = logging.getLogger("spiderfoot.api.security")
 
 def generate_api_key(length: int = 32) -> str:
     """Generate a random API key.
-    
+
     Args:
         length: Length of the API key
-    
+
     Returns:
         Random API key string
     """
@@ -36,7 +36,7 @@ def setup_cors(
     allowed_headers: List[str] = ["*"]
 ) -> None:
     """Set up CORS for the FastAPI application.
-    
+
     Args:
         app: FastAPI application
         allowed_origins: List of allowed origins
@@ -57,7 +57,7 @@ class APIKeyAuth:
     
     def __init__(self, api_key_name: str = "X-API-Key", api_key: Optional[str] = None):
         """Initialize API key authentication.
-        
+
         Args:
             api_key_name: API key header name
             api_key: API key value (if None, a random key will be generated)
@@ -68,13 +68,13 @@ class APIKeyAuth:
     
     def verify_api_key(self, api_key: str) -> bool:
         """Verify API key.
-        
+
         Args:
             api_key: API key to verify
-            
+
         Returns:
             True if API key is valid
-            
+
         Raises:
             HTTPException: If API key is invalid
         """
@@ -93,12 +93,12 @@ def create_api_key_handler(
     show_api_key: bool = False
 ) -> APIKeyAuth:
     """Create an API key handler for the FastAPI application.
-    
+
     Args:
         app: FastAPI application
         api_key: API key (if None, a random key will be generated)
         show_api_key: Whether to log the API key
-        
+
     Returns:
         APIKeyAuth instance
     """

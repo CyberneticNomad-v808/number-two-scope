@@ -220,7 +220,8 @@ class SpiderFootTarget:
     def matches(
         self, value: str, includeParents: bool = False, includeChildren: bool = True
     ) -> bool:
-        """Check whether the supplied value is "tightly" related to the original target.
+        """Check whether the supplied value is "tightly" related to the
+        original target.
 
         Tightly in this case means:
 

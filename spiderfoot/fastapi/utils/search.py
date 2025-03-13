@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Search Utilities
+"""SpiderFoot FastAPI Search Utilities.
 
-This module provides utilities for search operations in the SpiderFoot API.
+This module provides utilities for search operations in the SpiderFoot
+API.
 """
 
 import html
@@ -19,7 +19,7 @@ class SearchHelper:
     
     def __init__(self, config: Dict[str, Any]):
         """Initialize search helper.
-        
+
         Args:
             config: SpiderFoot configuration
         """
@@ -33,12 +33,12 @@ class SearchHelper:
         value: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Search for data based on criteria.
-        
+
         Args:
             scan_id: Optional scan ID to filter by
             event_type: Optional event type to filter by
             value: Optional value to filter by
-            
+
         Returns:
             List of search results
         """
@@ -100,10 +100,10 @@ class SearchHelper:
     
     def get_scan_history(self, scan_id: str) -> List[Dict[str, Any]]:
         """Get historical data for a scan.
-        
+
         Args:
             scan_id: Scan ID
-            
+
         Returns:
             List of historical data points
         """

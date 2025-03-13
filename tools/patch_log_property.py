@@ -4,9 +4,8 @@ import re
 
 
 def patch_base_class(root_dir):
-    """
-    Find and patch the base SpiderFootPlugin class to add a log property setter.
-    This is the preferred solution as it will fix all modules at once.
+    """Find and patch the base SpiderFootPlugin class to add a log property
+    setter. This is the preferred solution as it will fix all modules at once.
 
     Returns True if the base class was patched, False otherwise.
     """
@@ -86,8 +85,8 @@ def patch_base_class(root_dir):
 
 
 def patch_individual_modules(root_dir):
-    """
-    Patch each individual module to add a log property setter.
+    """Patch each individual module to add a log property setter.
+
     This is the fallback solution if we can't find the base class.
     """
     module_files = []

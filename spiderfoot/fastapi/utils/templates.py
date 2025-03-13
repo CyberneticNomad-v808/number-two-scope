@@ -1,7 +1,7 @@
-"""
-SpiderFoot FastAPI Template Utilities
+"""SpiderFoot FastAPI Template Utilities.
 
-This module provides utilities for working with templates in the FastAPI implementation.
+This module provides utilities for working with templates in the FastAPI
+implementation.
 """
 
 import os
@@ -24,7 +24,7 @@ class TemplateManager:
         mako_dirs: Optional[List[str]] = None
     ):
         """Initialize template manager.
-        
+
         Args:
             template_dir: Directory containing Jinja2 templates
             mako_dirs: Directories containing Mako templates
@@ -39,12 +39,12 @@ class TemplateManager:
         context: Dict[str, Any] = None
     ) -> HTMLResponse:
         """Render a Jinja2 template.
-        
+
         Args:
             request: FastAPI request
             template_name: Name of template file
             context: Template context
-        
+
         Returns:
             HTMLResponse: Rendered template
         """
@@ -61,11 +61,11 @@ class TemplateManager:
         context: Dict[str, Any] = None
     ) -> HTMLResponse:
         """Render a Mako template.
-        
+
         Args:
             template_name: Name of template file
             context: Template context
-        
+
         Returns:
             HTMLResponse: Rendered template
         """
@@ -79,11 +79,11 @@ class TemplateManager:
     
     def render_error(self, message: str, docroot: str = "/") -> HTMLResponse:
         """Render error template.
-        
+
         Args:
             message: Error message
             docroot: Document root path
-        
+
         Returns:
             HTMLResponse: Rendered error template
         """

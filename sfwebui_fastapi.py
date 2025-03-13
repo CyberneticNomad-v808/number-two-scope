@@ -1152,7 +1152,8 @@ def initialize_sf_api(web_config: dict, config: dict):
     try:
         # Modified setup_logging call to pass debug flag instead of log_level
         setup_logging(app, debug=config.get("_debug", False))
-        setup_error_handlers(app, html_error_template=sf_api_instance.error_html)
+        setup_error_handlers(
+            app, html_error_template=sf_api_instance.error_html)
         setup_cors(
             app,
             allowed_origins=web_config.get(

@@ -4,13 +4,16 @@ from typing import Dict
 
 app = FastAPI(title="SpiderFoot API")
 
+
 @app.get("/")
 async def root() -> Dict[str, str]:
     return {"message": "Welcome to SpiderFoot API"}
 
+
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     return {"status": "healthy"}
+
 
 @app.get("/info")
 async def server_info() -> Dict[str, str]:

@@ -67,7 +67,7 @@ def main():
     parser.add_argument(
         '-F', '--fastapi', help='Use FastAPI web interface instead of CherryPy.', action='store_true')
     options = parser.parse_args()
-    
+
     # Load the default configuration from the config file
     sf = SpiderFoot(opts)
     sfConfig = sf.defaultConfig()
@@ -86,7 +86,7 @@ def main():
         loggingQueue = mp.Queue()
         logListenerSetup(loggingQueue, sfConfig)
         logWorkerSetup(loggingQueue)
-        
+
         sf = SpiderFoot(sfConfig)
         modlist = sf.modulesProducing("")
         modules = dict()

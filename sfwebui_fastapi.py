@@ -1602,7 +1602,7 @@ def setup_app(web_config: dict, config: dict):
 
 def start_cherrypy_server(web_config: dict, config: dict):
     """Start the CherryPy web server implementation.
-    
+
     Args:
         web_config (dict): Web interface configuration
         config (dict): SpiderFoot configuration

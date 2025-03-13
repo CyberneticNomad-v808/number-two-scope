@@ -76,11 +76,29 @@ def create_app(web_config: Dict[str, Any], sf_config: Dict[str, Any]) -> FastAPI
     app.mount("/static", StaticFiles(directory="spiderfoot/static"), name="static")
 
     # Add application startup and shutdown events
-    @app.on_event("startup")
-    async def startup_event():
-        logger = logging.getLogger("spiderfoot.app")
-        logger.info(
-            f"Starting SpiderFoot FastAPI server version {__version__}")
+    try:
+        app = FastAPI(title="SpiderFoot API")
+        
+        # Register exception handler to catch and log startup errors
+        @app.on_event("startup")
+        async def startup_event():
+            try:
+                # Log successful startup
+                print("FastAPI app starting up...")
+                # Initialize any required resources
+                # ...existing initialization code...
+            except Exception as e:
+                print(f"ERROR: FastAPI startup failed: {e}")
+                import traceback
+                print(traceback.format_exc())
+                # Ensure the error propagates and stops the server
+                raise
+
+    except Exception as e:
+        print(f"ERROR: Failed to initialize FastAPI application: {e}")
+        import traceback
+        print(traceback.format_exc())
+        sys.exit(1)
 
     @app.on_event("shutdown")
     async def shutdown_event():

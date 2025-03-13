@@ -295,5 +295,24 @@ def main():
             print(f"Unknown output format: {options.o}")
 
 
+def start():
+    try:
+        uvicorn_kwargs = {
+            'host': args.host, 
+            'port': args.port,
+            'log_level': "debug" if args.debug else "info"
+        }
+        # Log that we're attempting to start FastAPI
+        if args.debug:
+            print(f"Starting FastAPI server with parameters: {uvicorn_kwargs}")
+        uvicorn.run("spiderfoot.web.fastapi_web.app:app", **uvicorn_kwargs)
+    except Exception as e:
+        print(f"Error starting FastAPI server: {e}")
+        if args.debug:
+            import traceback
+            print(traceback.format_exc())
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

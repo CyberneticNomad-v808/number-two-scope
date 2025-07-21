@@ -174,4 +174,5 @@ cover/
 #################
 docs/_build/
 .ruff_cache
-.pytest_cache
+.pytest_cache# Database files
+dbname=*

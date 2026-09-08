@@ -57,6 +57,14 @@ class WorkspaceEndpoints:
         try:
             ws = SpiderFootWorkspace(self.config, workspace_id=workspace_id)
             return {
+                # Required by the Generate Report modal's JS
+                # (templates/workspace_details.tmpl), which gates report
+                # generation on `data.success && data.scans && ...`. This
+                # key was missing entirely on the success path, so that
+                # check could never pass and the "No Scans Available"
+                # dialog fired unconditionally regardless of how many
+                # scans existed or whether they'd finished.
+                "success": True,
                 "workspace_id": ws.workspace_id,
                 "name": ws.name,
                 "description": ws.description,

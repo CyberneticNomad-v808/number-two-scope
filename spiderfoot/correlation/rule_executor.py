@@ -14,6 +14,16 @@ from copy import deepcopy
 from collections import defaultdict
 from spiderfoot.correlation.rule_loader import RuleLoader
 
+class _HeadlineRef:
+    """Lightweight attribute-access wrapper so headline templates can use
+    dotted placeholders like {source.data}/{entity.data}/{child.data}
+    against a plain value via str.format()."""
+    def __init__(self, data):
+        self.data = data
+
+    def __str__(self):
+        return str(self.data)
+
 class RuleExecutionStrategy:
     """Base class for pluggable rule execution strategies."""
     def execute(self, dbh, rule, scan_ids):
@@ -70,16 +80,29 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
 
         collections = rule.get('collections', {})
 
-        # Handle both dict and list formats for collections
+        # Handle both dict and list formats for collections. Real rule YAML
+        # (correlations/*.yaml) always nests 'collect' under a 'condition' key
+        # on each collection entry, e.g.:
+        #   collections:
+        #   - id: foo
+        #     condition:
+        #       collect: [...]
+        # A flat 'collect' key directly on the collection dict is also
+        # accepted for backward compatibility with older/simplified fixtures.
         if isinstance(collections, list):
-            # Test format: collections is a list of dicts with 'collect' key
             collect_rules = []
             for collection in collections:
-                if 'collect' in collection:
+                condition = collection.get('condition') if isinstance(collection, dict) else None
+                if isinstance(condition, dict) and 'collect' in condition:
+                    collect_rules.extend(condition['collect'])
+                elif isinstance(collection, dict) and 'collect' in collection:
                     collect_rules.extend(collection['collect'])
         else:
-            # YAML format: collections is a dict with 'collect' key
-            collect_rules = collections.get('collect', [])
+            condition = collections.get('condition') if isinstance(collections, dict) else None
+            if isinstance(condition, dict) and 'collect' in condition:
+                collect_rules = condition['collect']
+            else:
+                collect_rules = collections.get('collect', []) if isinstance(collections, dict) else []
 
         if not collect_rules:
             log.warning("No collection rules defined")
@@ -98,33 +121,46 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         log = logging.getLogger("spiderfoot.correlation.collect")
 
         try:
-            # Check which table schema we're working with
-            # Try the simplified test schema first
-            try:
-                dbh_lock = getattr(dbh, 'dbhLock', None)
-                ph = getattr(dbh, '_placeholder', lambda: '?')()
+            # Check which table schema we're working with. Probe with the
+            # REAL production columns first: 'scan_instance_id, type, data'
+            # alone exist in both the full schema and any simplified test
+            # schema, so that probe can never distinguish the two and always
+            # took this branch (including in production), silently replacing
+            # every event's real module/created/source_event_hash with
+            # placeholder values. Probing with the full column set instead
+            # only succeeds when those columns genuinely exist.
+            dbh_lock = getattr(dbh, 'dbhLock', None)
+            ph = getattr(dbh, '_placeholder', lambda: '?')()
 
+            try:
                 if dbh_lock:
                     with dbh_lock:
-                        dbh.dbh.execute(f"SELECT scan_instance_id, type, data FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1", [scan_id])
-                        test_row = dbh.dbh.fetchone()
+                        dbh.dbh.execute(
+                            f"SELECT hash, type, data, module, generated, source_event_hash "
+                            f"FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1",
+                            [scan_id]
+                        )
+                        dbh.dbh.fetchone()
                 else:
-                    # For tests without lock
-                    dbh.dbh.execute(f"SELECT scan_instance_id, type, data FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1", [scan_id])
-                    test_row = dbh.dbh.fetchone()
+                    dbh.dbh.execute(
+                        f"SELECT hash, type, data, module, generated, source_event_hash "
+                        f"FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1",
+                        [scan_id]
+                    )
+                    dbh.dbh.fetchone()
 
-                # Use simplified schema for tests
-                base_query = f"SELECT hash, type, data, 'test_module' as module, 0 as created, 'ROOT' as source_event_hash FROM tbl_scan_results WHERE scan_instance_id = {ph}"
-                query_params = [scan_id]
-
-            except Exception:
-                # Use full production schema
-                ph = getattr(dbh, '_placeholder', lambda: '?')()
+                # Full production schema is present - use the real columns.
                 base_query = f"""
                     SELECT hash, type, data, module, generated, source_event_hash
                     FROM tbl_scan_results
                     WHERE scan_instance_id = {ph} AND false_positive = 0
                 """
+                query_params = [scan_id]
+
+            except Exception:
+                # Fall back to the simplified schema (e.g. test fixtures that
+                # only define scan_instance_id/type/data on tbl_scan_results).
+                base_query = f"SELECT hash, type, data, 'test_module' as module, 0 as created, 'ROOT' as source_event_hash FROM tbl_scan_results WHERE scan_instance_id = {ph}"
                 query_params = [scan_id]
 
             # Execute query
@@ -270,9 +306,33 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         log = logging.getLogger("spiderfoot.correlation.create")
 
         try:
-            # Generate correlation title using headline template
+            # Generate correlation title using headline template. Rule
+            # headlines use several placeholder styles across the shipped
+            # correlations/*.yaml files: {data}, {count}, {summary}, and
+            # dotted attribute access like {source.data}/{entity.data}/
+            # {child.data}. This engine's collection model is flat (it
+            # doesn't track distinct source/entity/child roles per event),
+            # so source/entity/child are all aliased to the same
+            # representative event's data as a best-effort compatibility
+            # shim - not a full re-implementation of role-based collection.
             headline = rule.get('headline', 'Correlation found')
-            correlation_title = headline.format(data=group_key)
+            representative_data = events[0].get('data', group_key) if events else group_key
+            unique_data = sorted({str(e.get('data', '')) for e in events}) if events else []
+            summary = ', '.join(unique_data[:5]) + ('...' if len(unique_data) > 5 else '')
+            format_ctx = {
+                'data': group_key,
+                'count': len(events),
+                'summary': summary,
+                'source': _HeadlineRef(representative_data),
+                'entity': _HeadlineRef(representative_data),
+                'child': _HeadlineRef(representative_data),
+            }
+            try:
+                correlation_title = headline.format(**format_ctx)
+            except (KeyError, IndexError):
+                # Unknown placeholder in the template - fall back to the
+                # simple {data} substitution rather than losing the result.
+                correlation_title = headline.format(data=group_key)
 
             # Use first scan ID as the primary scan
             scan_id = scan_ids[0] if scan_ids else 'unknown'

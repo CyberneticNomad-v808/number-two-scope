@@ -1,8 +1,13 @@
 import cherrypy
+import csv
 import json
+import time
+from io import StringIO
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
 from mako.template import Template
 from spiderfoot.workspace import SpiderFootWorkspace
-from spiderfoot import __version__
+from spiderfoot import __version__, SpiderFootDb
 
 class WorkspaceEndpoints:
     @cherrypy.expose
@@ -255,6 +260,105 @@ class WorkspaceEndpoints:
             return "{}"
         except Exception as e:
             return str(e)
+
+    @cherrypy.expose
+    def workspacereportexport(self, workspace_id, format='json'):
+        """Export all events from every scan in a workspace as a single
+        JSON, CSV, or XML file.
+
+        This is the actual working replacement for the "Generate Report"
+        button in workspace_details.tmpl, which previously pointed at a
+        route (/scanexport) that never existed, and at workspacemcpreport /
+        workspacereportdownload, which called an undefined method
+        (SpiderFootWorkspace.generate_mcp_report) and returned an empty
+        placeholder respectively. No LLM/AI dependency, no external
+        service -- straight scan_instance_id + tbl_scan_results dump,
+        same DB access pattern as the already-working
+        scanexportjsonmulti/scaneventresultexportmulti in webui/export.py.
+        """
+        fmt = (format or 'json').lower()
+        if fmt not in ('json', 'csv', 'xml'):
+            cherrypy.response.status = 400
+            return json.dumps({"error": f"Unsupported format: {format}. Use json, csv, or xml."}).encode('utf-8')
+
+        try:
+            ws = SpiderFootWorkspace(self.config, workspace_id=workspace_id)
+        except Exception as e:
+            cherrypy.response.status = 404
+            return json.dumps({"error": f"Workspace not found: {e}"}).encode('utf-8')
+
+        dbh = SpiderFootDb(self.config)
+        rows = []
+        for scan_id in ws.get_scan_ids():
+            scan_info = dbh.scanInstanceGet(scan_id)
+            scan_name = scan_info[0] if scan_info else scan_id
+            scan_status = scan_info[5] if scan_info and len(scan_info) > 5 else ""
+            try:
+                events = dbh.scanResultEvent(scan_id)
+            except Exception:
+                continue
+            for event in events:
+                # scanResultEvent() column order: generated, data, module,
+                # hash, type, source_event_hash, confidence, visibility, risk
+                generated, data, module, event_hash, event_type, source_hash, confidence, visibility, risk = event[:9]
+                if event_type == "ROOT":
+                    continue
+                rows.append({
+                    "scan_id": scan_id,
+                    "scan_name": scan_name,
+                    "scan_status": scan_status,
+                    "generated": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(generated)) if generated else "",
+                    "event_type": event_type,
+                    "module": module,
+                    "data": str(data).replace("<SFURL>", "").replace("</SFURL>", ""),
+                    "confidence": confidence,
+                    "visibility": visibility,
+                    "risk": risk,
+                    "event_hash": event_hash,
+                    "source_event_hash": source_hash,
+                })
+
+        fname = f"workspace-{workspace_id}-report.{fmt}"
+        cherrypy.response.headers['Content-Disposition'] = f"attachment; filename={fname}"
+        cherrypy.response.headers['Pragma'] = 'no-cache'
+
+        if fmt == 'json':
+            cherrypy.response.headers['Content-Type'] = "application/json; charset=utf-8"
+            return json.dumps({
+                "workspace_id": workspace_id,
+                "workspace_name": ws.name,
+                "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "event_count": len(rows),
+                "events": rows,
+            }, indent=2).encode('utf-8')
+
+        if fmt == 'csv':
+            cherrypy.response.headers['Content-Type'] = "text/csv; charset=utf-8"
+            fileobj = StringIO()
+            fieldnames = ["scan_id", "scan_name", "scan_status", "generated", "event_type",
+                          "module", "data", "confidence", "visibility", "risk",
+                          "event_hash", "source_event_hash"]
+            writer = csv.DictWriter(fileobj, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+            return fileobj.getvalue().encode('utf-8')
+
+        # fmt == 'xml'
+        cherrypy.response.headers['Content-Type'] = "application/xml; charset=utf-8"
+        root = ET.Element("workspaceReport", {
+            "workspaceId": workspace_id,
+            "workspaceName": ws.name or "",
+            "generatedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "eventCount": str(len(rows)),
+        })
+        for row in rows:
+            event_el = ET.SubElement(root, "event")
+            for key, value in row.items():
+                child = ET.SubElement(event_el, key)
+                child.text = "" if value is None else str(value)
+        raw_xml = ET.tostring(root, encoding="unicode")
+        pretty_xml = minidom.parseString(raw_xml).toprettyxml(indent="  ")
+        return pretty_xml.encode('utf-8')
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

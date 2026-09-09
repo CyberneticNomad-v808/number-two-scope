@@ -104,34 +104,22 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         log = logging.getLogger("spiderfoot.correlation.collect")
 
         try:
-            # Check which table schema we're working with
-            # Try the simplified test schema first
-            try:
-                dbh_lock = getattr(dbh, 'dbhLock', None)
-                ph = getattr(dbh, '_placeholder', lambda: '?')()
-
-                if dbh_lock:
-                    with dbh_lock:
-                        dbh.dbh.execute(f"SELECT scan_instance_id, type, data FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1", [scan_id])
-                        test_row = dbh.dbh.fetchone()
-                else:
-                    # For tests without lock
-                    dbh.dbh.execute(f"SELECT scan_instance_id, type, data FROM tbl_scan_results WHERE scan_instance_id = {ph} LIMIT 1", [scan_id])
-                    test_row = dbh.dbh.fetchone()
-
-                # Use simplified schema for tests
-                base_query = f"SELECT hash, type, data, 'test_module' as module, 0 as created, 'ROOT' as source_event_hash FROM tbl_scan_results WHERE scan_instance_id = {ph}"
-                query_params = [scan_id]
-
-            except Exception:
-                # Use full production schema
-                ph = getattr(dbh, '_placeholder', lambda: '?')()
-                base_query = f"""
-                    SELECT hash, type, data, module, generated, source_event_hash
-                    FROM tbl_scan_results
-                    WHERE scan_instance_id = {ph} AND false_positive = 0
-                """
-                query_params = [scan_id]
+            # Always use the real production tbl_scan_results schema. (This
+            # used to probe with a simplified "test schema" query first and
+            # only fall back to this one on failure -- but the probe query
+            # only touched columns that exist in both schemas, so it always
+            # succeeded in production too, silently hardcoding
+            # module='test_module', created=0, source_event_hash='ROOT' for
+            # every collected event instead of using the real values
+            # sfp__stor_db.py wrote. See refactor plan Item 2.)
+            ph = getattr(dbh, '_placeholder', lambda: '?')()
+            dbh_lock = getattr(dbh, 'dbhLock', None)
+            base_query = f"""
+                SELECT hash, type, data, module, generated, source_event_hash
+                FROM tbl_scan_results
+                WHERE scan_instance_id = {ph} AND false_positive = 0
+            """
+            query_params = [scan_id]
 
             # Execute query
             events = []

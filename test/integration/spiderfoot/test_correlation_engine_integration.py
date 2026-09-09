@@ -276,6 +276,34 @@ def test_cross_scan_correlation(dbh):
     assert 'Cross Scan Rule' in results['cross_scan_rule']['meta']['name']
     assert results['cross_scan_rule']['matched'] is True
 
+def test_get_scan_events_uses_real_column_values(dbh):
+    """
+    Regression test for Item 2: _get_scan_events() must return the REAL
+    module/generated/source_event_hash values from tbl_scan_results, not
+    the hardcoded 'test_module'/0/'ROOT' literals the old schema-detection
+    branch always substituted. Use values that deliberately differ from
+    those literals so a regression can't hide behind a coincidental match.
+    """
+    from spiderfoot.correlation.rule_executor import DefaultRuleExecutionStrategy
+
+    dbh, scan_id = dbh
+    real_hash = _insert_event(
+        dbh, scan_id, 'IP_ADDRESS', '203.0.113.5',
+        module='sfp_dnsresolve', generated=1234567890, source_event_hash='deadbeef01'
+    )
+    dbh.conn.commit()
+
+    strategy = DefaultRuleExecutionStrategy()
+    collect_rules = [{'method': 'exact', 'field': 'type', 'value': 'IP_ADDRESS'}]
+    events = strategy._get_scan_events(dbh, scan_id, collect_rules)
+
+    matching = [e for e in events if e['hash'] == real_hash]
+    assert len(matching) == 1, f"Expected exactly 1 event with hash {real_hash}, found {len(matching)}"
+    event = matching[0]
+    assert event['module'] == 'sfp_dnsresolve', f"module was overwritten: {event['module']}"
+    assert event['created'] == 1234567890, f"created (generated) was overwritten: {event['created']}"
+    assert event['source_event_hash'] == 'deadbeef01', f"source_event_hash was overwritten: {event['source_event_hash']}"
+
 def test_rule_loader_yaml():
     from spiderfoot.correlation.rule_loader import RuleLoader
     yaml_str = '''

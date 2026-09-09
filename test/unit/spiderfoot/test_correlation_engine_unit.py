@@ -73,6 +73,37 @@ def test_create_correlation_result_handles_alternate_headline_placeholders(rule_
     assert '{' not in title, f"Rule {rule_id} left an unsubstituted placeholder in title: {title!r}"
     assert 'example-value.test' in title, f"Rule {rule_id} title missing substituted value: {title!r}"
 
+RULES_WITH_ENTITY_OR_CHILD_AGGREGATION = [
+    'stale_host', 'http_errors', 'data_from_base64', 'data_from_docmeta',
+]
+
+@pytest.mark.parametrize("rule_id", RULES_WITH_ENTITY_OR_CHILD_AGGREGATION)
+def test_aggregate_events_handles_entity_and_child_prefixes(rule_id):
+    """
+    Regression test for Item 5: _get_field_value() used to only special-case
+    a 'source.' prefix. Rules aggregating on 'entity.data'/'child.data'
+    fell through to a literal dict-key lookup that never matched, so
+    _aggregate_events() collapsed every distinct event into a single
+    ''-keyed group. Confirm 2 events with distinct 'data' values now land
+    in 2 separate groups instead of 1.
+    """
+    loader = RuleLoader('correlations/')
+    loader.load_rules()
+    rule = next((r for r in loader.rules if r.get('id') == rule_id), None)
+    assert rule is not None, f"Could not find rule {rule_id} in correlations/"
+
+    strategy = DefaultRuleExecutionStrategy()
+    events = [
+        {'hash': 'event1', 'type': 'DUMMY', 'data': 'host-one.example.com'},
+        {'hash': 'event2', 'type': 'DUMMY', 'data': 'host-two.example.com'},
+    ]
+    groups = strategy._aggregate_events(events, rule.get('aggregation', {}))
+
+    assert len(groups) == 2, (
+        f"Rule {rule_id}: expected 2 distinct groups, got {len(groups)}: {list(groups.keys())}"
+    )
+    assert '' not in groups, f"Rule {rule_id}: events collapsed into an empty-string-keyed group"
+
 def test_rule_loader_from_dict():
     # Simulate loading rules from a dict
     loader = RuleLoader(None)

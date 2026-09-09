@@ -200,10 +200,18 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
     def _get_field_value(self, event, field):
         """Get field value from event, supporting nested references."""
         if '.' in field:
-            # Handle nested fields like 'source.data'
+            # Handle nested fields like 'source.data', 'entity.data',
+            # 'child.data' -- all 3 aliases are used across real rules
+            # (see e.g. stale_host.yaml/http_errors.yaml for 'entity.data',
+            # data_from_base64.yaml/data_from_docmeta.yaml for
+            # 'child.data') and all mean the same thing in this simplified
+            # engine: the event's own 'data' field. Previously only
+            # 'source.' was handled, so 'entity.'/'child.' fell through to
+            # a literal event.get('entity.data', '') lookup that never
+            # matched any real key, collapsing every event into one
+            # ''-keyed group during aggregation.
             parts = field.split('.')
-            if parts[0] == 'source':
-                # For source fields, we'll use the event data as placeholder
+            if parts[0] in ('source', 'entity', 'child'):
                 return event.get('data', '')
 
         return event.get(field, '')

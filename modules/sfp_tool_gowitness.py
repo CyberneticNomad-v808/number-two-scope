@@ -66,6 +66,10 @@ class sfp_tool_gowitness(SpiderFootAsyncPlugin):
         super().setup(sfc, userOpts or {})
         self.errorState = False
         self.results = self.tempStorage()
+        self.check_binary("gowitness_path")
+        # chrome_path is genuinely optional -- gowitness auto-detects a
+        # system chrome/chromium if left blank, per its own opt description.
+        self.check_binary("chrome_path", required=False)
 
     def watchedEvents(self):
         return ["LINKED_URL_INTERNAL", "DOMAIN_NAME"]

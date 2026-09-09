@@ -73,6 +73,7 @@ class sfp_subfinder(SpiderFootAsyncPlugin):
         super().setup(sfc, userOpts or {})
         self.errorState = False
         self.results = self.tempStorage()
+        self.check_binary("subfinder_path")
 
     def watchedEvents(self):
         return ["DOMAIN_NAME", "ROOT"]

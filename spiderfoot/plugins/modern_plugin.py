@@ -150,6 +150,59 @@ class SpiderFootModernPlugin(SpiderFootPlugin):
             self._registry = None
 
     # ------------------------------------------------------------------
+    # Binary preflight check (Item 7 of the correlation/module refactor)
+    # ------------------------------------------------------------------
+
+    def check_binary(self, opt_name: str, required: bool = True) -> bool:
+        """Verify a configured tool-path option points at a real,
+        executable file, and set self.errorState immediately if not.
+
+        Ported tool-wrapper modules (sfp_httpx, sfp_tool_dnsx, etc.) used
+        to only discover a missing binary lazily, on the first matching
+        handleEvent() call -- logging an error there and setting
+        errorState, which silently makes the module inert for the rest of
+        the scan with no upfront signal. Call this from setup() instead so
+        a bad path fails immediately and visibly, before the scan starts
+        depending on the module.
+
+        Args:
+            opt_name: the self.opts key holding the configured path
+                (e.g. 'httpx_path').
+            required: if True (default) and the path is missing/not
+                executable, sets self.errorState = True and logs an
+                error. If False, only logs a debug note (for genuinely
+                optional tools) and returns the check result without
+                marking the module as errored.
+
+        Returns:
+            True if the path exists and is executable, False otherwise.
+        """
+        import os
+        import shutil
+
+        path = (self.opts.get(opt_name, '') or '').strip()
+        if not path:
+            # No explicit path configured -- try resolving the option's
+            # implied binary name on $PATH as a last resort (matches how
+            # each module's own lazy _find_* helper already behaves).
+            guessed_name = opt_name.rsplit('_path', 1)[0]
+            resolved = shutil.which(guessed_name)
+            if resolved:
+                return True
+            msg = f"No {opt_name} configured and '{guessed_name}' not found on PATH"
+        elif not (os.path.isfile(path) and os.access(path, os.X_OK)):
+            msg = f"{opt_name} is set to '{path}' but that file doesn't exist or isn't executable"
+        else:
+            return True
+
+        if required:
+            self.log.error(f"[{self.__class__.__name__}] {msg}; module will not run this scan.")
+            self.errorState = True
+        else:
+            self.log.debug(f"[{self.__class__.__name__}] {msg} (optional, continuing).")
+        return False
+
+    # ------------------------------------------------------------------
     # Service accessors (lazy resolution — always None in this codebase)
     # ------------------------------------------------------------------
 

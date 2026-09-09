@@ -66,6 +66,7 @@ class sfp_tool_nikto(SpiderFootAsyncPlugin):
         super().setup(sfc, userOpts or {})
         self.errorState = False
         self.results = self.tempStorage()
+        self.check_binary("nikto_path")
 
     def watchedEvents(self):
         return ["DOMAIN_NAME", "IP_ADDRESS", "LINKED_URL_INTERNAL"]

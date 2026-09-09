@@ -82,6 +82,7 @@ class sfp_httpx(SpiderFootAsyncPlugin):
         super().setup(sfc, userOpts or {})
         self.errorState = False
         self.results = self.tempStorage()
+        self.check_binary("httpx_path")
 
     def watchedEvents(self):
         return [

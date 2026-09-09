@@ -67,6 +67,7 @@ class sfp_tool_dnsx(SpiderFootAsyncPlugin):
         super().setup(sfc, userOpts or {})
         self.errorState = False
         self.results = self.tempStorage()
+        self.check_binary("dnsx_path")
 
     def watchedEvents(self):
         return ["INTERNET_NAME", "INTERNET_NAME_UNRESOLVED", "DOMAIN_NAME"]

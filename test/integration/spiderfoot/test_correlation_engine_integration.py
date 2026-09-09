@@ -1,8 +1,34 @@
 import pytest
 import os
+import uuid
 from spiderfoot import SpiderFootDb
 from spiderfoot.correlation.rule_executor import RuleExecutor
 import yaml
+
+def _insert_event(dbh, scan_id, event_type, data, module='test_module',
+                   generated=0, source_event_hash='ROOT', false_positive=0):
+    """Insert a row matching the real production tbl_scan_results schema."""
+    event_hash = uuid.uuid4().hex
+    dbh.dbh.execute(
+        "INSERT INTO tbl_scan_results "
+        "(scan_instance_id, hash, type, generated, module, data, false_positive, source_event_hash) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        (scan_id, event_hash, event_type, generated, module, data, false_positive, source_event_hash)
+    )
+    return event_hash
+
+def _ensure_scan_instance(dbh, scan_id, name=None):
+    """Insert a tbl_scan_instance row for scan_id if one doesn't exist yet.
+
+    tbl_scan_correlation_results.scan_instance_id has a real FK to
+    tbl_scan_instance(guid), so any scan_id used to create a correlation
+    result must exist there first.
+    """
+    dbh.dbh.execute(
+        "INSERT INTO tbl_scan_instance (guid, name, seed_target, status) "
+        "VALUES (%s, %s, %s, %s) ON CONFLICT (guid) DO NOTHING",
+        (scan_id, name or scan_id, 'test-target.example.com', 'FINISHED')
+    )
 
 @pytest.fixture
 def dbh():
@@ -13,21 +39,30 @@ def dbh():
     db_port = os.environ['SPIDERFOOT_DB_PORT']
     db_name = os.environ['SPIDERFOOT_DB_NAME']
     dsn = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-    
+
     config = {'__database': dsn, '__dbtype': 'postgresql'}
     dbh = SpiderFootDb(config, init=True)
     scan_id = 'integration_scan'
-    # Ensure table is dropped and created fresh
+    # Ensure table is dropped and created fresh, matching the REAL production
+    # tbl_scan_results schema (see spiderfoot/db/db_core.py) rather than a
+    # simplified stand-in -- _get_scan_events() queries the real columns
+    # (scan_instance_id, hash, module, generated, source_event_hash,
+    # false_positive), so the fixture must provide them.
     dbh.dbh.execute("DROP TABLE IF EXISTS tbl_scan_results")
     dbh.dbh.execute("""
         CREATE TABLE tbl_scan_results (
-            scan_id TEXT, type TEXT, data TEXT
+            scan_instance_id VARCHAR NOT NULL,
+            hash VARCHAR NOT NULL,
+            type VARCHAR NOT NULL,
+            generated INT NOT NULL,
+            module VARCHAR NOT NULL,
+            data VARCHAR,
+            false_positive INT NOT NULL DEFAULT 0,
+            source_event_hash VARCHAR DEFAULT 'ROOT'
         )
     """)
-    dbh.dbh.execute(
-        "INSERT INTO tbl_scan_results (scan_id, type, data) VALUES (%s, %s, %s)",
-        (scan_id, 'EMAILADDR', 'integration@example.com')
-    )
+    _ensure_scan_instance(dbh, scan_id)
+    _insert_event(dbh, scan_id, 'EMAILADDR', 'integration@example.com')
     dbh.conn.commit()
     return dbh, scan_id
 
@@ -42,7 +77,7 @@ def test_correlation_engine_integration(dbh):
             'scope': 'scan',
         },
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -66,7 +101,7 @@ def test_multiple_rules(dbh):
             'id': 'match_rule',
             'meta': {'name': 'Match Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
             'collections': [
-                {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+                {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
             ],
             'aggregation': {'field': 'data'},
             'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -76,7 +111,7 @@ def test_multiple_rules(dbh):
             'id': 'no_match_rule',
             'meta': {'name': 'No Match Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
             'collections': [
-                {'collect': [{'method': 'exact', 'field': 'type', 'value': 'SOMETHINGELSE'}]}
+                {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'SOMETHINGELSE'}]}}
             ],
             'aggregation': {'field': 'data'},
             'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -99,7 +134,7 @@ def test_threshold_logic(dbh):
         'id': 'threshold_rule',
         'meta': {'name': 'Threshold Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 2}],
@@ -118,7 +153,7 @@ def test_non_matching_event_type(dbh):
         'id': 'nonmatch_type_rule',
         'meta': {'name': 'Nonmatch Type Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'IP_ADDRESS'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'IP_ADDRESS'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -146,7 +181,7 @@ def test_empty_events(dbh):
         'id': 'no_events_rule',
         'meta': {'name': 'No Events Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -171,16 +206,14 @@ def test_multiple_scans(dbh):
     dbh, scan_id = dbh
     # Add a second scan with a different event
     scan_id2 = 'integration_scan2'
-    dbh.dbh.execute(
-        "INSERT INTO tbl_scan_results (scan_id, type, data) VALUES (%s, %s, %s)",
-        (scan_id2, 'EMAILADDR', 'integration2@example.com')
-    )
+    _ensure_scan_instance(dbh, scan_id2)
+    _insert_event(dbh, scan_id2, 'EMAILADDR', 'integration2@example.com')
     dbh.conn.commit()
     rule = {
         'id': 'multi_scan_rule',
         'meta': {'name': 'Multi Scan Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],
@@ -203,7 +236,7 @@ def test_parametrized_threshold_and_type(dbh, event_type, threshold, should_matc
         'id': 'param_rule',
         'meta': {'name': 'Param Rule', 'description': '', 'risk': 'INFO', 'scope': 'scan'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': event_type}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': event_type}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': threshold}],
@@ -223,20 +256,15 @@ def test_parametrized_threshold_and_type(dbh, event_type, threshold, should_matc
 def test_cross_scan_correlation(dbh):
     dbh, scan_id = dbh
     scan_id2 = 'integration_scan2'
-    dbh.dbh.execute(
-        "INSERT INTO tbl_scan_results (scan_id, type, data) VALUES (?, ?, ?)",
-        (scan_id2, 'EMAILADDR', 'shared@example.com')
-    )
-    dbh.dbh.execute(
-        "INSERT INTO tbl_scan_results (scan_id, type, data) VALUES (?, ?, ?)",
-        (scan_id, 'EMAILADDR', 'shared@example.com')
-    )
+    _ensure_scan_instance(dbh, scan_id2)
+    _insert_event(dbh, scan_id2, 'EMAILADDR', 'shared@example.com')
+    _insert_event(dbh, scan_id, 'EMAILADDR', 'shared@example.com')
     dbh.conn.commit()
     rule = {
         'id': 'cross_scan_rule',
         'meta': {'name': 'Cross Scan Rule', 'description': '', 'risk': 'INFO', 'scope': 'workspace'},
         'collections': [
-            {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+            {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
         ],
         'aggregation': {'field': 'data'},
         'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 2}],
@@ -258,7 +286,9 @@ def test_rule_loader_yaml():
     risk: INFO
     scope: scan
   collections:
-    collect:
+  - id: yaml_rule_collection
+    condition:
+      collect:
         - method: exact
           field: type
           value: EMAILADDR

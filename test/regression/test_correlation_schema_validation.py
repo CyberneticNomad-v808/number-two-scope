@@ -28,7 +28,9 @@ against the schema in the test suite.
 
 import unittest
 import os
+from unittest.mock import MagicMock, patch
 from spiderfoot.correlation.rule_loader import RuleLoader
+from spiderfoot.correlation.rule_executor import DefaultRuleExecutionStrategy
 
 
 class TestCorrelationSchemaValidation(unittest.TestCase):
@@ -110,6 +112,67 @@ class TestCorrelationSchemaValidation(unittest.TestCase):
             self.assertIn('name', meta, f"Rule {rule.get('id')} missing 'meta.name'")
             self.assertIn('description', meta, f"Rule {rule.get('id')} missing 'meta.description'")
             self.assertIn('risk', meta, f"Rule {rule.get('id')} missing 'meta.risk'")
+
+    def test_all_rules_produce_nonempty_collect_rules(self):
+        """
+        Regression test for the Item-1 bug: DefaultRuleExecutionStrategy
+        ._collect_events() must actually extract a non-empty 'collect' list
+        from every REAL on-disk rule's collections, not just from synthetic
+        test fixtures. Every real rule nests 'collect' under
+        collections[i]['condition']['collect'] -- if the extraction logic
+        regresses to only checking collections[i]['collect'] directly, this
+        test must fail.
+
+        We can't observe the private 'collect_rules' list directly, so we
+        spy on _apply_collection_filter: it is only ever invoked (once per
+        collect rule, inside _get_scan_events) when collect_rules is
+        non-empty. Zero calls means the rule's collections were parsed into
+        an empty list, i.e. this bug has recurred.
+        """
+        loader = RuleLoader(self.correlations_dir)
+        loader.load_rules()
+
+        if loader.errors:
+            self.skipTest("Skipping due to loading errors in other test")
+
+        strategy = DefaultRuleExecutionStrategy()
+
+        # Minimal mock DB handle: one dummy row shaped like a real
+        # tbl_scan_results row, so _get_scan_events' query succeeds and
+        # reaches the "apply collection filters" loop.
+        dummy_row = ('dummyhash', 'DUMMY_EVENT_TYPE', 'dummydata', 'test_module', 0, 'ROOT')
+
+        # These 2 rules use an entirely different, unimplemented rule schema
+        # (condition: {event_type, data_contains} + multi-collection/key
+        # aggregation) rather than the standard condition.collect list -- see
+        # refactor plan Item 6. Tracked separately; not a Item-1 regression.
+        KNOWN_UNSUPPORTED_SCHEMA_RULES = {
+            'tiktok_user_correlation',
+            'blockchain_risk_aggregation',
+        }
+
+        broken_rules = []
+        for rule in loader.rules:
+            if rule.get('id') in KNOWN_UNSUPPORTED_SCHEMA_RULES:
+                continue
+            mock_dbh = MagicMock()
+            mock_dbh.dbhLock = None
+            mock_dbh._placeholder = lambda: '%s'
+            mock_dbh.dbh.fetchall.return_value = [dummy_row]
+
+            with patch.object(
+                DefaultRuleExecutionStrategy, '_apply_collection_filter',
+                wraps=strategy._apply_collection_filter
+            ) as spy:
+                strategy._collect_events(mock_dbh, rule, ['dummy_scan'])
+                if spy.call_count == 0:
+                    broken_rules.append(rule.get('id', rule.get('filename', 'unknown')))
+
+        self.assertEqual(
+            broken_rules, [],
+            f"{len(broken_rules)} rule(s) produced an empty collect_rules list "
+            f"(correlation can never match for these): {broken_rules}"
+        )
 
     def test_collections_field_is_array(self):
         """

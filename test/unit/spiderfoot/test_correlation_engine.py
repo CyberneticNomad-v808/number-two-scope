@@ -20,7 +20,7 @@ class TestCorrelationEngineUnit(TestModuleBase):
                 'scope': 'scan',
             },
             'collections': [
-                {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}
+                {'condition': {'collect': [{'method': 'exact', 'field': 'type', 'value': 'EMAILADDR'}]}}
             ],
             'aggregation': {'field': 'data'},
             'analysis': [{'method': 'threshold', 'field': 'data', 'minimum': 1}],

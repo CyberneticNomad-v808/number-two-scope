@@ -497,6 +497,14 @@ class SpiderFootScanner():
             from spiderfoot.correlation.event_enricher import EventEnricher
             from spiderfoot.correlation.result_aggregator import ResultAggregator
 
+            # Respect enable_correlation from start_multiscan()/workspace.py.
+            # Default to True (existing behavior) when absent, so direct,
+            # non-workspace scans that never set this key are unaffected.
+            if not self.__config.get('__enablecorrelation__', True):
+                self.__sf.status(
+                    f"Correlation disabled for scan [{self.__scanId}], skipping.")
+                return
+
             # Check if correlation rules exist
             if '__correlationrules__' not in self.__config:
                 self.__sf.error("No correlation rules found in configuration")

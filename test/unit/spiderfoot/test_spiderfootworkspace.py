@@ -462,3 +462,45 @@ class TestSpiderFootWorkspaceComprehensive:
         # This should not cause memory issues
         summary = workspace.get_workspace_summary()
         assert summary['statistics']['target_count'] == 50
+
+    @pytest.mark.parametrize("enable_correlation,expected", [
+        ('true', True),
+        ('True', True),
+        ('false', False),
+        ('false', False),
+    ])
+    def test_start_multiscan_wires_enable_correlation_into_cfg(self, enable_correlation, expected):
+        """
+        Regression test for Item 3: enable_correlation used to be accepted
+        by start_multiscan() but never actually reach the spawned scan's
+        config -- it only affected a status message. Confirm the cfg dict
+        passed to the scan process now carries the real, converted flag.
+        """
+        workspace = SpiderFootWorkspace(self.config, name="Correlation Flag Test")
+
+        captured = {}
+
+        class FakeProcess:
+            def __init__(self, target=None, args=None):
+                # startSpiderFootScanner signature:
+                # (loggingQueue, scanName, scanId, targetValue, targetType, moduleList, globalOpts)
+                captured['cfg'] = args[6]
+                self.daemon = False
+
+            def start(self):
+                pass
+
+        with patch('spiderfoot.workspace.mp.Process', FakeProcess), \
+             patch.object(workspace, 'import_single_scan', return_value=None):
+            result = workspace.start_multiscan(
+                target_list=['example.com'],
+                module_list=['sfp_dnsresolve'],
+                scan_name_prefix='enable-correlation-test',
+                enable_correlation=enable_correlation,
+            )
+
+        assert result.get('success') is True
+        assert '__enablecorrelation__' in captured['cfg'], (
+            "start_multiscan() did not thread enable_correlation into the scan cfg at all"
+        )
+        assert captured['cfg']['__enablecorrelation__'] is expected

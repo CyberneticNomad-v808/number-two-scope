@@ -548,6 +548,13 @@ class SpiderFootWorkspace:
                 # Create configuration copy for this scan
                 self.log.debug("[MULTISCAN] Creating configuration copy...")
                 cfg = deepcopy(self.config)
+                # Actually wire enable_correlation through to the scan
+                # process -- it used to only affect a status message text
+                # and never reached the scanner, so callers had no way to
+                # actually enable/disable correlation. scanner.py's
+                # runCorrelations() reads this key, defaulting to True when
+                # absent for non-workspace scans that don't set it.
+                cfg['__enablecorrelation__'] = enable_correlation.lower() == 'true'
 
                 # Start the scan using the correct signature
                 scan_id = SpiderFootHelpers.genScanInstanceId()

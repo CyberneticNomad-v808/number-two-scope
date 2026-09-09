@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 from spiderfoot.correlation.rule_loader import RuleLoader
-from spiderfoot.correlation.rule_executor import DefaultRuleExecutionStrategy
+from spiderfoot.correlation.rule_executor import DefaultRuleExecutionStrategy, RuleExecutor
 from spiderfoot.correlation.event_enricher import EventEnricher
 from spiderfoot.correlation.result_aggregator import ResultAggregator
 
@@ -103,6 +103,53 @@ def test_aggregate_events_handles_entity_and_child_prefixes(rule_id):
         f"Rule {rule_id}: expected 2 distinct groups, got {len(groups)}: {list(groups.keys())}"
     )
     assert '' not in groups, f"Rule {rule_id}: events collapsed into an empty-string-keyed group"
+
+RULES_WITH_UNSUPPORTED_SCHEMA = ['blockchain_risk_aggregation', 'tiktok_user_correlation']
+
+@pytest.mark.parametrize("rule_id", RULES_WITH_UNSUPPORTED_SCHEMA)
+def test_unsupported_aggregation_schema_fails_cleanly(rule_id, caplog):
+    """
+    Regression test for Item 6: blockchain_risk_aggregation.yaml and
+    tiktok_user_correlation.yaml use a list-shaped 'aggregation' (a
+    multi-collection/key-join schema this engine doesn't implement) which
+    used to raise AttributeError ('list' object has no attribute 'get'),
+    caught only by RuleExecutor.run()'s outer blanket except. Directly
+    exercise _aggregate_events() with the real rule's aggregation value
+    (this is the path that actually crashed) and confirm it now returns
+    an empty dict with a clear warning logged, instead of raising.
+    """
+    import logging as _logging
+
+    loader = RuleLoader('correlations/')
+    loader.load_rules()
+    rule = next((r for r in loader.rules if r.get('id') == rule_id), None)
+    assert rule is not None, f"Could not find rule {rule_id} in correlations/"
+    assert isinstance(rule.get('aggregation'), list), (
+        f"Rule {rule_id} no longer has a list-shaped aggregation -- "
+        f"update this test if Item 6 was fully implemented instead of guarded."
+    )
+
+    strategy = DefaultRuleExecutionStrategy()
+    dummy_events = [{'hash': 'e1', 'type': 'DUMMY', 'data': 'x'}]
+
+    with caplog.at_level(_logging.WARNING, logger="spiderfoot.correlation.aggregate"):
+        groups = strategy._aggregate_events(dummy_events, rule['aggregation'], rule_id=rule_id)
+
+    assert groups == {}
+    assert any(rule_id in rec.message for rec in caplog.records), (
+        "Expected a warning log naming the rule when its aggregation schema is unsupported"
+    )
+
+    # Also confirm the full RuleExecutor.run() path never raises for this
+    # rule (end-to-end, via the real _collect_events -> _aggregate_events
+    # chain), regardless of which step short-circuits first.
+    mock_dbh = MagicMock()
+    mock_dbh.dbhLock = None
+    mock_dbh._placeholder = lambda: '%s'
+    mock_dbh.dbh.fetchall.return_value = []
+    executor = RuleExecutor(mock_dbh, [rule], scan_ids=['scan1'])
+    results = executor.run()  # must not raise
+    assert results[rule_id]['matched'] is False
 
 def test_rule_loader_from_dict():
     # Simulate loading rules from a dict

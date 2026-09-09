@@ -42,7 +42,8 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
             }
 
         # Step 2: Apply aggregation if specified
-        aggregated_groups = self._aggregate_events(collected_events, rule.get('aggregation', {}))
+        aggregated_groups = self._aggregate_events(
+            collected_events, rule.get('aggregation', {}), rule_id=rule.get('id'))
         log.debug(f"Created {len(aggregated_groups)} aggregated groups")
 
         # Step 3: Apply analysis if specified
@@ -181,11 +182,32 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
             # Unknown method, return all events
             return events
 
-    def _aggregate_events(self, events, aggregation):
+    def _aggregate_events(self, events, aggregation, rule_id=None):
         """Group events according to aggregation rules."""
         if not aggregation or not events:
             # No aggregation, return all events in a single group
             return {'all': events}
+
+        if isinstance(aggregation, list):
+            # A small number of rules (e.g. blockchain_risk_aggregation,
+            # tiktok_user_correlation) use a completely different,
+            # multi-collection/key-join aggregation schema:
+            #   aggregation:
+            #     - collections: ["a", "b", "c"]
+            #       key: "source_event"
+            # This engine doesn't implement that join at all. It used to
+            # crash here with AttributeError ('list' object has no
+            # attribute 'get'), caught 2 layers up by a blanket except and
+            # logged as an opaque error. Fail loudly-but-cleanly instead:
+            # log a specific "not supported yet" warning and produce no
+            # groups, rather than a bare AttributeError traceback.
+            log = logging.getLogger("spiderfoot.correlation.aggregate")
+            log.warning(
+                f"Rule {rule_id or 'unknown'} uses a list-shaped 'aggregation' "
+                f"(multi-collection/key-join schema) that this engine does not "
+                f"implement yet -- skipping aggregation for this rule."
+            )
+            return {}
 
         field = aggregation.get('field', 'data')
         groups = defaultdict(list)

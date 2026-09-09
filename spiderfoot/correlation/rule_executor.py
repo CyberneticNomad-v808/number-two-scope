@@ -264,9 +264,32 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
         log = logging.getLogger("spiderfoot.correlation.create")
 
         try:
-            # Generate correlation title using headline template
+            # Generate correlation title using headline template. Real
+            # rule files use several different placeholder aliases for
+            # "the aggregated value" -- {data}, {source.data},
+            # {entity.data}, {child.data} -- plus {count}/{summary} on a
+            # couple of rules. group_key is currently just that single
+            # aggregated value, so supply it under every alias the rule
+            # files actually use rather than only 'data'.
             headline = rule.get('headline', 'Correlation found')
-            correlation_title = headline.format(data=group_key)
+            _alias = type('_HeadlineAlias', (), {'data': group_key})()
+            format_kwargs = {
+                'data': group_key,
+                'source': _alias,
+                'entity': _alias,
+                'child': _alias,
+                'count': len(events),
+                'summary': group_key,
+            }
+            try:
+                correlation_title = headline.format(**format_kwargs)
+            except (KeyError, IndexError, AttributeError) as fmt_err:
+                log.warning(
+                    f"Headline template for rule {rule.get('id', 'unknown')} "
+                    f"references an unsupported placeholder ({fmt_err}); "
+                    f"using the raw template as the title instead."
+                )
+                correlation_title = headline
 
             # Use first scan ID as the primary scan
             scan_id = scan_ids[0] if scan_ids else 'unknown'

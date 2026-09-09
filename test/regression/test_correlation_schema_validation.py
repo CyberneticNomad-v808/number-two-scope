@@ -174,6 +174,39 @@ class TestCorrelationSchemaValidation(unittest.TestCase):
             f"(correlation can never match for these): {broken_rules}"
         )
 
+    def test_headline_placeholders_are_supported(self):
+        """
+        Regression test for Item 4: every {placeholder} used in a rule's
+        headline template must be one that
+        DefaultRuleExecutionStrategy._create_correlation_result() actually
+        supplies (data, source.data, entity.data, child.data, count,
+        summary). Catches a future rule shipping with an unsupported
+        placeholder before it silently falls back to the raw template.
+        """
+        import re
+
+        loader = RuleLoader(self.correlations_dir)
+        loader.load_rules()
+        if loader.errors:
+            self.skipTest("Skipping due to loading errors in other test")
+
+        supported = {'data', 'source.data', 'entity.data', 'child.data', 'count', 'summary'}
+        placeholder_re = re.compile(r'\{([^{}!:]+?)(?:[!:][^{}]*)?\}')
+
+        unsupported = {}
+        for rule in loader.rules:
+            headline = rule.get('headline', '')
+            placeholders = set(placeholder_re.findall(headline))
+            bad = placeholders - supported
+            if bad:
+                unsupported[rule.get('id', rule.get('filename'))] = bad
+
+        self.assertEqual(
+            unsupported, {},
+            f"Rule(s) with headline placeholders not supported by "
+            f"_create_correlation_result(): {unsupported}"
+        )
+
     def test_collections_field_is_array(self):
         """
         Test that the collections field in all rules is an array.

@@ -916,6 +916,23 @@ class DbCore:
                 self.conn.close()
                 self.conn = None
 
+    def __del__(self) -> None:
+        # Safety net for callers that create a SpiderFootDb (e.g. every
+        # webui request handler does `dbh = SpiderFootDb(self.config)`)
+        # and never explicitly call close(). SpiderFootDb wires each of
+        # its managers with a back-reference to itself, which makes a
+        # reference cycle -- CPython's refcounting alone won't collect
+        # that when the local `dbh` goes out of scope, only a periodic
+        # cyclic-GC pass will. Without this, the underlying psycopg2
+        # connection (opened eagerly in __init__) just sits open, "idle
+        # in transaction" per its autocommit=False default, until GC
+        # eventually gets to it. This doesn't make cleanup immediate, but
+        # guarantees it isn't a true permanent leak either way.
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def vacuumDB(self) -> bool:
         """Vacuum the database. Clears unused database file pages.
 

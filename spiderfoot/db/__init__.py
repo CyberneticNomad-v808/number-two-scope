@@ -254,6 +254,68 @@ class SpiderFootDb:
         ['RAW_FILE_META_DATA', 'Raw File Meta Data', 1, 'DATA'],
         ['SEARCH_ENGINE_WEB_CONTENT', 'Search Engine Web Content', 1, 'DATA'],
         ['SOCIAL_MEDIA', 'Social Media Presence', 0, 'ENTITY'],
+        ['SOCIAL_MEDIA_PROFILE', 'Social Media Profile', 0, 'ENTITY'],
+        # The following event types are genuinely constructed via
+        # SpiderFootEvent(...) by modules in this codebase but were never
+        # added here, causing a foreign key violation (and silently dropped
+        # scan results) any time the producing module actually ran. Found by
+        # cross-referencing every module's producedEvents()/SpiderFootEvent()
+        # calls against this list.
+        ['AI_ANOMALY_DETECTED', 'AI Anomaly Detected', 0, 'DESCRIPTOR'],
+        ['AI_IOC_CORRELATION', 'AI IOC Correlation', 0, 'DESCRIPTOR'],
+        ['AI_NLP_ANALYSIS', 'AI NLP Analysis', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_PREDICTION', 'AI Threat Prediction', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SCORE', 'AI Threat Score', 0, 'DESCRIPTOR'],
+        ['AI_THREAT_SIGNATURE', 'AI Threat Signature', 0, 'DESCRIPTOR'],
+        ['APARAT_VIDEO', 'Aparat Video', 1, 'DATA'],
+        ['API_KEY_LEAK', 'API Key Leak', 0, 'DESCRIPTOR'],
+        ['ARBITRUM_ADDRESS', 'Arbitrum Address', 0, 'ENTITY'],
+        ['ARBITRUM_TX', 'Arbitrum Transaction', 1, 'DATA'],
+        ['BEHAVIORAL_PATTERN', 'Behavioral Pattern', 0, 'DESCRIPTOR'],
+        ['BLOCKCHAIN_ANALYSIS', 'Blockchain Analysis', 0, 'DESCRIPTOR'],
+        ['BLOCKCHAIN_TRANSACTION_FLOW', 'Blockchain Transaction Flow', 0, 'DESCRIPTOR'],
+        ['BLUESKY_POST', 'Bluesky Post', 1, 'DATA'],
+        ['CACHE_STATS', 'Cache Statistics', 1, 'DATA'],
+        ['CORRELATION_ANALYSIS', 'Correlation Analysis', 0, 'DESCRIPTOR'],
+        ['RESOURCE_USAGE', 'Resource Usage', 1, 'DATA'],
+        ['CARRIER_NAME', 'Carrier Name', 0, 'DESCRIPTOR'],
+        ['CARRIER_TYPE', 'Carrier Type', 0, 'DESCRIPTOR'],
+        ['CLOUD_INSTANCE_TYPE', 'Cloud Instance Type', 0, 'DESCRIPTOR'],
+        ['CLOUD_PROVIDER', 'Cloud Provider', 0, 'DESCRIPTOR'],
+        ['CREDENTIAL_LEAK', 'Credential Leak', 0, 'DESCRIPTOR'],
+        ['CRYPTOCURRENCY_EXCHANGE_ATTRIBUTION', 'Cryptocurrency Exchange Attribution', 0, 'DESCRIPTOR'],
+        ['CRYPTOCURRENCY_RISK_ASSESSMENT', 'Cryptocurrency Risk Assessment', 0, 'DESCRIPTOR'],
+        ['DIDEO_VIDEO', 'Dideo Video', 1, 'DATA'],
+        ['DISCORD_MESSAGE', 'Discord Message', 1, 'DATA'],
+        ['DOUYIN_VIDEO', 'Douyin Video', 1, 'DATA'],
+        ['ENTITY_RELATIONSHIP', 'Entity Relationship', 0, 'DESCRIPTOR'],
+        ['FOURCHAN_POST', '4chan Post', 1, 'DATA'],
+        ['GEOSPATIAL_CLUSTER', 'Geospatial Cluster', 0, 'DESCRIPTOR'],
+        ['IDENTITY_RESOLUTION', 'Identity Resolution', 0, 'DESCRIPTOR'],
+        ['INTERNATIONAL_FORMAT', 'Phone Number - International Format', 0, 'DESCRIPTOR'],
+        ['IS_POSSIBLE', 'Phone Number - Is Possible', 0, 'DESCRIPTOR'],
+        ['IS_VALID', 'Phone Number - Is Valid', 0, 'DESCRIPTOR'],
+        ['LINE_TYPE', 'Phone Number - Line Type', 0, 'DESCRIPTOR'],
+        ['LOCAL_FORMAT', 'Phone Number - Local Format', 0, 'DESCRIPTOR'],
+        ['LOCATION', 'Location', 0, 'DESCRIPTOR'],
+        ['MONEY_LAUNDERING_INDICATOR', 'Money Laundering Indicator', 0, 'DESCRIPTOR'],
+        ['NUMBER_TYPE', 'Phone Number - Type', 0, 'DESCRIPTOR'],
+        ['OPTIMIZATION_SUGGESTION', 'Optimization Suggestion', 1, 'DATA'],
+        ['PERFORMANCE_STATS', 'Performance Statistics', 1, 'DATA'],
+        ['REGION_NAME', 'Phone Number - Region Name', 0, 'DESCRIPTOR'],
+        ['SANCTIONS_LIST_MATCH', 'Sanctions List Match', 0, 'DESCRIPTOR'],
+        ['SOCIAL_MEDIA_CONTENT', 'Social Media Content', 1, 'DATA'],
+        ['SOCIAL_MEDIA_HASHTAG', 'Social Media Hashtag', 0, 'DESCRIPTOR'],
+        ['SUSPICIOUS_ACTIVITY', 'Suspicious Activity', 0, 'DESCRIPTOR'],
+        ['TARGET_WEB_CONTENT_TYPE', 'Target Web Content Type', 0, 'DESCRIPTOR'],
+        ['TELEGRAM_MESSAGE', 'Telegram Message', 1, 'DATA'],
+        ['TEMPORAL_PATTERN', 'Temporal Pattern', 0, 'DESCRIPTOR'],
+        ['THREAT_INTELLIGENCE', 'Threat Intelligence', 0, 'DESCRIPTOR'],
+        ['THREAT_INTEL_SUMMARY', 'Threat Intelligence Summary', 0, 'DESCRIPTOR'],
+        ['URL_DIRECTORY', 'URL (Directory)', 0, 'DESCRIPTOR'],
+        ['WALLET_CLUSTER', 'Wallet Cluster', 0, 'DESCRIPTOR'],
+        ['WECHAT_MESSAGE', 'WeChat Message', 1, 'DATA'],
+        ['XIAOHONGSHU_POST', 'Xiaohongshu Post', 1, 'DATA'],
         ['SIMILAR_ACCOUNT_EXTERNAL', 'Similar Account on External Site', 0, 'ENTITY'],
         ['SIMILARDOMAIN', 'Similar Domain', 0, 'ENTITY'],
         ['SIMILARDOMAIN_WHOIS', 'Similar Domain - Whois', 1, 'DATA'],
@@ -466,6 +528,8 @@ class SpiderFootDb:
         return self._scan.scanInstanceDelete(*args, **kwargs)
     def scanInstanceList(self):
         return self._scan.scanInstanceList()
+    def reconcileStaleScans(self) -> int:
+        return self._scan.reconcileStaleScans()
     def scanInstanceSet(self, instanceId: str, started: str = None, ended: str = None, status: str = None):
         """
         Direct pass-through to the underlying _scan.scanInstanceSet method.
@@ -530,6 +594,8 @@ class SpiderFootDb:
     # --- SCAN RESULT / EVENT FUNCTIONS ---
     def scanResultEvent(self, instanceId: str, eventType: str = 'ALL', srcModule: str = None, data: list = None, sourceId: list = None, correlationId: str = None, filterFp: bool = False) -> list:
         return self._event.scanResultEvent(instanceId, eventType, srcModule, data, sourceId, correlationId, filterFp)
+    def scanResultEventForGraph(self, instanceId: str, filterFp: bool = False) -> list:
+        return self._event.scanResultEventForGraph(instanceId, filterFp)
     def scanResultEventUnique(self, instanceId: str, eventType: str = 'ALL', filterFp: bool = False) -> list:
         return self._event.scanResultEventUnique(instanceId, eventType, filterFp)
     def scanResultSummary(self, instanceId: str, by: str = "type") -> list:

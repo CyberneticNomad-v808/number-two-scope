@@ -63,13 +63,28 @@ class SecurityLogger:
         # Remove existing handlers to avoid duplicates
         self.logger.handlers.clear()
 
-        # File handler for security events
-        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-        self.logger.addHandler(file_handler)
+        # File handler for security events. This is a module-level singleton
+        # created at import time (see bottom of file) -- if it raises, every
+        # module that imports security_middleware fails to import, which
+        # crashes the whole app before it can even serve a health check.
+        # A container recreated with mismatched volume ownership (seen live:
+        # rootless-Podman UID/namespace drift across container recreations
+        # leaving the log directory owned by a UID that no longer matches
+        # this container's own "spiderfoot" UID) must not be fatal to
+        # startup -- fall back to console-only logging instead.
+        try:
+            file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
+        except OSError as e:
+            sys.stderr.write(
+                f"security_logging: could not open {self.log_file} for "
+                f"writing ({e}); continuing with console-only security "
+                f"logging.\n"
+            )
 
         # Console handler
         if console_output:
@@ -217,15 +232,26 @@ class ErrorHandler:
         self.security_logger = security_logger or SecurityLogger()
         self.error_logger = logging.getLogger('spiderfoot.errors')
 
-        # Set up error logger
+        # Set up error logger. Same reasoning as SecurityLogger above: this
+        # runs at import time via the module-level ErrorHandler(...)
+        # singleton near the bottom of this file, so an unhandled failure
+        # here is just as fatal to the whole app's startup.
         if not self.error_logger.handlers:
-            handler = logging.FileHandler('logs/errors.log', encoding='utf-8')
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            handler.setFormatter(formatter)
-            self.error_logger.addHandler(handler)
-            self.error_logger.setLevel(logging.ERROR)
+            try:
+                handler = logging.FileHandler('logs/errors.log', encoding='utf-8')
+                formatter = logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                )
+                handler.setFormatter(formatter)
+                self.error_logger.addHandler(handler)
+                self.error_logger.setLevel(logging.ERROR)
+            except OSError as e:
+                sys.stderr.write(
+                    f"security_logging: could not open logs/errors.log for "
+                    f"writing ({e}); continuing without a file handler for "
+                    f"the error logger.\n"
+                )
+                self.error_logger.setLevel(logging.ERROR)
 
     def handle_exception(self, e: Exception, context: Dict[str, Any] = None,
                         user_id: str = None, ip_address: str = None,

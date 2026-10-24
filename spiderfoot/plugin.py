@@ -602,8 +602,17 @@ class SpiderFootPlugin:
             self.sf._dbh = self.__sfdb__
 
             if not (self.incomingEventQueue and self.outgoingEventQueue):
-                self.sf.error(
-                    "Please set up queues before starting module as thread")
+                # start() already verified both queues were set before
+                # spawning this thread, so reaching here with them unset
+                # means something cleared them in the window between
+                # thread.start() and this thread actually being scheduled
+                # -- in practice, threadsFinished() nulling incomingEventQueue
+                # for a module the orchestrator already marked errorState.
+                # That's a benign race on an already-failed module, not a
+                # fresh problem, so don't log it as a new error.
+                if not getattr(self, 'errorState', False):
+                    self.sf.error(
+                        "Please set up queues before starting module as thread")
                 return
 
             while not self.checkForStop():
@@ -656,6 +665,26 @@ class SpiderFootPlugin:
                 # if there are leftover objects in the queue, the scan will
                 # hang.
                 self.incomingEventQueue = None
+        finally:
+            # This connection was never closed on ANY exit path (normal
+            # completion, error, or interrupt) -- every module thread held
+            # its own Postgres connection open for the life of the scan
+            # process. psycopg2 defaults to autocommit=False, so a
+            # connection that ran even one query sits as "idle in
+            # transaction", not just "idle" -- holding a connection slot
+            # indefinitely. Seen live: a 5-target workspace multiscan (5
+            # concurrent scan processes) drove Postgres to exactly its
+            # max_connections=300 ceiling with 292 connections stuck in
+            # that state, cascading into "sorry, too many clients already"
+            # failures across unrelated modules (sfp_zetalytics,
+            # sfp_textmagic, ...) that had nothing to do with the actual
+            # leak.
+            dbh = getattr(self, '__sfdb__', None)
+            if dbh is not None:
+                try:
+                    dbh.close()
+                except Exception:
+                    pass
 
     def setSharedThreadPool(self, sharedThreadPool) -> None:
         """Set a shared thread pool for this module.

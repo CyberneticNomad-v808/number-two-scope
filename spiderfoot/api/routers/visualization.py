@@ -46,7 +46,7 @@ async def get_scan_graph_data(
             raise HTTPException(status_code=404, detail="Scan not found")
 
         # Get scan data for visualization
-        scan_results = dbh.scanResultEvent(scan_id, filter_type)
+        scan_results = dbh.scanResultEventForGraph(scan_id)
 
         if format.lower() == "gexf":
             # Generate GEXF format
@@ -111,7 +111,7 @@ async def get_multi_scan_graph_data(
                 logger.warning(f"Scan {scan_id} not found, skipping")
                 continue
 
-            scan_results = dbh.scanResultEvent(scan_id, filter_type)
+            scan_results = dbh.scanResultEventForGraph(scan_id)
             all_results.extend(scan_results)
 
         if not all_results:

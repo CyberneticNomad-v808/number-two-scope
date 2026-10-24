@@ -96,7 +96,8 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
         if db_type == 'postgresql':
             db_host = os.getenv('SPIDERFOOT_DB_HOST')
             db_port = os.getenv('SPIDERFOOT_DB_PORT', '5432')
-            db_name = os.getenv('SPIDERFOOT_DB', 'spiderfoot_db')
+            # Support both SPIDERFOOT_DB_NAME (preferred) and SPIDERFOOT_DB (legacy alias)
+            db_name = os.getenv('SPIDERFOOT_DB_NAME') or os.getenv('SPIDERFOOT_DB', 'spiderfoot_db')
             db_user = os.getenv('SPIDERFOOT_DB_USER', 'postgres')
             db_pass = os.getenv('SPIDERFOOT_DB_PASSWORD')
 
@@ -890,14 +891,16 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
         except Exception:
             return retdata
 
+        # See webui/helpers.py's searchBase() for the full explanation of
+        # this row shape (restored from db.py.backup's original 15-column
+        # search() query) and why the previous indices crashed.
         for row in data:
             lastseen = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
             escapeddata = html.escape(row[1])
             escapedsrc = html.escape(row[2])
             retdata.append([lastseen, escapeddata, escapedsrc,
-                            row[3], row[5], row[6], row[7], row[8], row[10],
-                            row[11], row[4], row[13], row[14]])
+                            row[3], row[9], row[5], row[6], row[7], row[4]])
 
         return retdata
 
@@ -1205,7 +1208,7 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
             if not sid:
                 return json.dumps({"nodes": [], "edges": [], "error": "No scan ID provided"})
             dbh = self._get_dbh()
-            data = dbh.scanResultEvent(sid)
+            data = dbh.scanResultEventForGraph(sid)
             scan = dbh.scanInstanceGet(sid)
 
             if not scan:
@@ -1237,7 +1240,7 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
                 if scan:
                     if not root_target:
                         root_target = scan[1]
-                    data = dbh.scanResultEvent(scan_id)
+                    data = dbh.scanResultEventForGraph(scan_id)
                     all_data.extend(data)
 
             if not all_data:
@@ -1251,12 +1254,16 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
-    def workspacescanresults(self, workspace_id, limit=100):
+    def workspacescanresults(self, workspace_id, limit=100, event_type=None):
         """Get workspace scan results.
 
         Args:
             workspace_id: Workspace ID to retrieve results for
             limit: Maximum results to return (default 100)
+            event_type: Optional event type prefix to filter by (matches
+                workspace_details.tmpl's #resultsFilter dropdown values --
+                exact for INTERNET_NAME/IP_ADDRESS/EMAILADDR, prefix for
+                the VULNERABILITY_* / MALICIOUS_* families)
         """
         try:
             # Convert string limit to int if needed
@@ -1268,29 +1275,73 @@ class WebUiRoutes(SettingsEndpoints, ScanEndpoints, ExportEndpoints, WorkspaceEn
                 except ValueError:
                     limit = 100
 
+            # Three bugs stacked here, all silently returning an empty
+            # results list regardless of actual data:
+            # 1. SFWorkspace(self.config) with no workspace_id ignored the
+            #    requested workspace entirely -- __init__ only loads an
+            #    existing workspace's data (self.scans etc.) when
+            #    workspace_id is passed; otherwise it silently creates a
+            #    brand-new, empty one.
+            # 2. get_workspace_summary() returns a summary dict with keys
+            #    like 'workspace_info'/'statistics'/'targets_by_type' --
+            #    there is no top-level 'scans' key in it at all. Using
+            #    getattr(that_dict, 'scans', []) can never find it either
+            #    way: dicts don't expose their keys as attributes, so this
+            #    always fell through to the [] default regardless of
+            #    workspace content. The actual scan list lives on the
+            #    workspace object's own .scans attribute.
+            # 3. Even with scans resolved, scanResultSummary() returns rows
+            #    grouped by event type (type, event_descr, last_in, total,
+            #    utotal) -- aggregate counts, not the individual
+            #    timestamp/event_type/event_data/source_module rows the
+            #    frontend (workspace_details.tmpl's loadResults()) expects
+            #    per result.
             from sfwebui import SpiderFootWorkspace as SFWorkspace
-            workspace = SFWorkspace(self.config)
-            workspace_instance = workspace.get_workspace_summary() if hasattr(workspace, "get_workspace_summary") else workspace  # noqa: E1101
-
-            if not workspace_instance:
-                return {'success': False, 'error': 'Workspace not found'}
+            workspace = SFWorkspace(self.config, workspace_id=workspace_id)
 
             from sfwebui import SpiderFootDb as SFDbWorkspace
             dbh = SFDbWorkspace(self.config)
             results = []
 
-            # Get scans from workspace
-            scans = getattr(workspace_instance, 'scans', [])
-            if scans:
-                for scan in scans[:limit]:  # Apply limit properly
-                    scan_data = dbh.scanResultSummary(scan.get('scan_id'))
-                    if scan_data:
-                        results.append(scan_data)
+            for scan in workspace.scans:
+                scan_id = scan.get('scan_id')
+                if not scan_id:
+                    continue
+                for row in dbh.scanResultEvent(scan_id):
+                    results.append({
+                        'timestamp': row[0],
+                        'event_type': row[4],
+                        'event_data': row[1],
+                        'source_module': row[2],
+                        'scan_id': scan_id
+                    })
+
+            # #resultsFilter's dropdown never actually filtered anything --
+            # this endpoint (the one CherryPy's MRO actually dispatches to;
+            # webui/workspace.py has an event_type-aware same-named method
+            # that's shadowed and never runs) didn't accept an event_type
+            # param at all, workspace_details.tmpl's loadResults() never
+            # read the dropdown's value or sent it, and nothing was bound
+            # to the dropdown's change event to even trigger a reload.
+            # Prefix match, not exact: INTERNET_NAME/IP_ADDRESS/EMAILADDR
+            # are real event types (exact match), but VULNERABILITY and
+            # MALICIOUS are families (VULNERABILITY_CVE_CRITICAL,
+            # MALICIOUS_IPADDR, etc.), not real event type strings on
+            # their own.
+            if event_type:
+                results = [
+                    r for r in results
+                    if r['event_type'].startswith(event_type)
+                ]
+
+            results.sort(key=lambda r: r['timestamp'], reverse=True)
+            total_results = len(results)
 
             return {
                 'success': True,
                 'workspace_id': workspace_id,
-                'results': results
+                'results': results[:limit],
+                'total_results': total_results
             }
 
         except Exception as e:

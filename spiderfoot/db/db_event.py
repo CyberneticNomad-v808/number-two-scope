@@ -136,11 +136,11 @@ class EventManager:
             raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
         ph = get_placeholder(self.db_type)
         qry = (
-            f"SELECT generated AS generated, component, type, message, rowid "
+            f"SELECT generated AS generated, component, type, message, id AS rowid "
             f"FROM tbl_scan_log WHERE scan_instance_id = {ph}"
         )
         if fromRowId:
-            qry += f" and rowid > {ph}"
+            qry += f" and id > {ph}"
         qry += " ORDER BY generated "
         if reverse:
             qry += "ASC"
@@ -266,6 +266,42 @@ class EventManager:
             except (psycopg2.Error) as e:
                 raise IOError(
                     "SQL error encountered when fetching result events"
+                ) from e
+
+    def scanResultEventForGraph(self, instanceId: str, filterFp: bool = False) -> list:
+        """Return scan result rows shaped for graph building
+        (SpiderFootHelpers.buildGraphData/buildGraphJson/buildGraphGexf).
+
+        Each row is (data, parent_data, type, event_type_category, hash):
+        parent_data is the source event's own data value (resolved via a
+        self-join on source_event_hash), not just the hash reference that
+        scanResultEvent() returns -- buildGraphData needs the actual parent
+        label to draw an edge. 'ROOT' parents (or missing source events, e.g.
+        due to false-positive filtering) fall back to the literal 'ROOT'
+        label, which callers already special-case and skip.
+        """
+        if not isinstance(instanceId, str):
+            raise TypeError(f"instanceId is {type(instanceId)}; expected str()")
+        ph = get_placeholder(self.db_type)
+        qry = (
+            f"SELECT c.data, COALESCE(p.data, 'ROOT') AS parent_data, "
+            f"c.type, e.event_type, c.hash "
+            f"FROM tbl_scan_results c "
+            f"JOIN tbl_event_types e ON e.event = c.type "
+            f"LEFT JOIN tbl_scan_results p ON p.hash = c.source_event_hash "
+            f"AND p.scan_instance_id = c.scan_instance_id "
+            f"WHERE c.scan_instance_id = {ph}"
+        )
+        if filterFp:
+            qry += " AND c.false_positive <> 1"
+        qvars = [instanceId]
+        with self.dbhLock:
+            try:
+                self.dbh.execute(qry, qvars)
+                return self.dbh.fetchall()
+            except (psycopg2.Error) as e:
+                raise IOError(
+                    "SQL error encountered when fetching graph data"
                 ) from e
 
     def scanResultEventUnique(
@@ -467,12 +503,18 @@ class EventManager:
                 f"sfEvent.risk value is {type(sfEvent.risk)}; "
                 f"expected 0 - 100"
             )
-        if (not isinstance(sfEvent.sourceEvent, SpiderFootEvent) and
-                sfEvent.eventType != "ROOT"):
-            raise TypeError(
-                f"sfEvent.sourceEvent is {type(sfEvent.sourceEvent)}; "
-                f"expected str()"
-            )
+        # Note: no separate check on sfEvent.sourceEvent itself here (there
+        # used to be one requiring it to be a real SpiderFootEvent for any
+        # non-ROOT eventType). SpiderFootEvent's own sourceEvent setter
+        # explicitly documents and supports sourceEvent=None for "testing
+        # or special cases", defaulting sourceEventHash to "ROOT" -- a
+        # legitimate, storable value used by e.g. sfp_advanced_correlation's
+        # scanFinished()-emitted aggregate events, which have no single
+        # parent event. That check rejected exactly this case with a
+        # TypeError whose own message didn't even match what it was
+        # checking ("expected str()" while testing isinstance(...,
+        # SpiderFootEvent)). What actually needs validating -- and gets
+        # stored -- is sourceEventHash, checked just below.
         if not isinstance(sfEvent.sourceEventHash, str):
             raise TypeError(
                 f"sfEvent.sourceEventHash is {type(sfEvent.sourceEventHash)}; "
@@ -483,8 +525,10 @@ class EventManager:
         storeData = sfEvent.data
         if isinstance(truncateSize, int) and truncateSize > 0:
             storeData = storeData[0:truncateSize]
-        # Always store generated as int (ms)
-        generated_ms = int(sfEvent.generated * 1000)
+        # generated is stored as whole seconds since epoch -- every reader
+        # of this column (ROUND(c.generated), TO_TIMESTAMP(generated),
+        # time.localtime() in search results) treats it as seconds, not ms.
+        generated_seconds = int(sfEvent.generated)
         ph = get_placeholder(self.db_type)
         qry = (
             f"INSERT INTO tbl_scan_results "
@@ -494,7 +538,7 @@ class EventManager:
             f"{ph}, {ph})"
         )
         qvals = [
-            instanceId, sfEvent.hash, sfEvent.eventType, generated_ms,
+            instanceId, sfEvent.hash, sfEvent.eventType, generated_seconds,
             sfEvent.confidence, sfEvent.visibility, sfEvent.risk,
             sfEvent.module, storeData, sfEvent.sourceEventHash
         ]
@@ -676,14 +720,15 @@ class EventManager:
         return datamap
 
     def get_sources(self, scan_id: str, event_hash: str) -> list:
-        qry = """
+        ph = get_placeholder(self.db_type)
+        qry = f"""
             SELECT s.hash, s.type, s.data, s.module, s.generated,
                    s.source_event_hash
             FROM tbl_scan_results c
             JOIN tbl_scan_results s
               ON c.source_event_hash = s.hash
-            WHERE c.scan_instance_id = ?
-              AND c.hash = ?
+            WHERE c.scan_instance_id = {ph}
+              AND c.hash = {ph}
               AND c.source_event_hash != 'ROOT'
         """
         qvars = [scan_id, event_hash]
@@ -708,12 +753,13 @@ class EventManager:
                 ) from e
 
     def get_entities(self, scan_id: str, event_hash: str) -> list:
-        qry = """
+        ph = get_placeholder(self.db_type)
+        qry = f"""
             SELECT c.hash, c.type, c.data, c.module, c.generated,
                    c.source_event_hash
             FROM tbl_scan_results c
-            WHERE c.scan_instance_id = ?
-              AND c.source_event_hash = ?
+            WHERE c.scan_instance_id = {ph}
+              AND c.source_event_hash = {ph}
               AND c.type IN (
                 SELECT event FROM tbl_event_types
                 WHERE event_type = 'ENTITY'
@@ -744,9 +790,19 @@ class EventManager:
         """
         Search for events in the scan results matching the given criteria.
 
-        Supported keys: scan_id (required), type, data, module,
-        start_date, end_date. Returns a list of matching rows, similar to
-        the legacy API.
+        Supported keys: scan_id (required), type, data, module, value,
+        regex, start_date, end_date.
+
+        Returns rows shaped (generated, data, source_data, module, type,
+        confidence, visibility, risk, hash, source_event_hash, event_descr,
+        event_type, scan_instance_id, false_positive, parent_false_positive)
+        -- restored from this project's own pre-refactor db.py.backup, which
+        every caller of this method (webui searchBase() in both
+        webui/helpers.py and webui/routes.py, and the FastAPI search-export
+        endpoint) still indexes into. The previous 9-column version silently
+        broke all three: they either raised IndexError past column 8 (caught
+        by a bare except and returned as empty results) or read the wrong
+        field entirely.
         """
         if not isinstance(criteria, dict):
             raise TypeError("criteria must be a dict")
@@ -758,40 +814,56 @@ class EventManager:
                 "criteria must include a valid 'scan_id' string"
             )
         ph = get_placeholder(self.db_type)
-        # Legacy tuple order: generated, data, module, hash, type,
-        # source_event_hash, confidence, visibility, risk
         qry = (
-            f"SELECT ROUND(generated) AS generated, data, module, hash, "
-            f"type, source_event_hash, confidence, visibility, risk "
-            f"FROM tbl_scan_results WHERE scan_instance_id = {ph}"
+            f"SELECT ROUND(c.generated) AS generated, c.data, "
+            f"COALESCE(s.data, 'ROOT') AS source_data, c.module, c.type, "
+            f"c.confidence, c.visibility, c.risk, c.hash, "
+            f"c.source_event_hash, t.event_descr, t.event_type, "
+            f"c.scan_instance_id, c.false_positive AS fp, "
+            f"COALESCE(s.false_positive, 0) AS parent_fp "
+            f"FROM tbl_scan_results c "
+            f"JOIN tbl_event_types t ON t.event = c.type "
+            f"LEFT JOIN tbl_scan_results s ON s.hash = c.source_event_hash "
+            f"AND s.scan_instance_id = c.scan_instance_id "
+            f"WHERE c.scan_instance_id = {ph}"
         )
         qvars = [scan_id]
         if 'type' in criteria and criteria['type']:
-            qry += f" AND type = {ph}"
+            qry += f" AND c.type = {ph}"
             qvars.append(criteria['type'])
         if 'data' in criteria and criteria['data']:
-            qry += f" AND data = {ph}"
+            qry += f" AND c.data = {ph}"
             qvars.append(criteria['data'])
         if 'module' in criteria and criteria['module']:
-            qry += f" AND module = {ph}"
+            qry += f" AND c.module = {ph}"
             qvars.append(criteria['module'])
+        if 'value' in criteria and criteria['value']:
+            qry += f" AND (c.data LIKE {ph} OR s.data LIKE {ph})"
+            qvars.append(criteria['value'])
+            qvars.append(criteria['value'])
+        if 'regex' in criteria and criteria['regex']:
+            qry += f" AND (c.data ~ {ph} OR s.data ~ {ph})"
+            qvars.append(criteria['regex'])
+            qvars.append(criteria['regex'])
         if 'start_date' in criteria and criteria['start_date']:
-            qry += f" AND generated >= {ph}"
+            qry += f" AND c.generated >= {ph}"
             start = criteria['start_date']
-            if start > 1000000000000:  # already ms
-                qvars.append(start)
+            # c.generated is stored in whole seconds; accept a ms-scale
+            # value from a caller too, same as end_date below.
+            if start > 1000000000000:
+                qvars.append(int(start / 1000))
             else:
-                qvars.append(int(start * 1000))
+                qvars.append(int(start))
         if 'end_date' in criteria and criteria['end_date']:
-            qry += f" AND generated <= {ph}"
+            qry += f" AND c.generated <= {ph}"
             end = criteria['end_date']
             if end > 1000000000000:
-                qvars.append(end)
+                qvars.append(int(end / 1000))
             else:
-                qvars.append(int(end * 1000))
+                qvars.append(int(end))
         if filterFp:
-            qry += " AND false_positive <> 1"
-        qry += " ORDER BY generated DESC"
+            qry += " AND c.false_positive <> 1"
+        qry += " ORDER BY c.data"
         with self.dbhLock:
             try:
                 self.dbh.execute(qry, qvars)

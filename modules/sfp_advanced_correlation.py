@@ -91,7 +91,10 @@ class AdvancedCorrelationEngine:
                     'time_window': time_bucket * time_window_hours * 3600,
                     'event_count': len(bucket_events),
                     'event_types': Counter(e.get('type', 'unknown') for e in bucket_events),
-                    'entities': set(e.get('entity', '') for e in bucket_events),
+                    # json.dumps() (in _analyze_temporal_patterns() below)
+                    # can't serialize a set -- listify it. Counter above is
+                    # fine as-is since it subclasses dict.
+                    'entities': list(set(e.get('entity', '') for e in bucket_events)),
                     'confidence': min(1.0, len(bucket_events) / 10.0)
                 }
                 patterns.append(pattern)

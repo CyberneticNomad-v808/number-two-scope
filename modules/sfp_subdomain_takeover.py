@@ -48,17 +48,31 @@ class sfp_subdomain_takeover(SpiderFootPlugin):
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 
-        content = self.sf.cacheGet("subjack-fingerprints", 48)
+        # Cache key changed from "subjack-fingerprints" to
+        # "can-i-take-over-xyz-fingerprints" deliberately: the old key had
+        # a poisoned 404 response cached under it from before this source
+        # swap (the pre-fix code cached fetchUrl()'s result unconditionally,
+        # with no HTTP-status check), and cacheGet() runs before any of the
+        # fetch/validation logic below -- reusing the old key would keep
+        # serving that stale garbage for its full 48h TTL regardless of any
+        # fix here, exactly what happened live the first time this shipped.
+        content = self.sf.cacheGet("can-i-take-over-xyz-fingerprints", 48)
         if content is None:
-            url = "https://raw.githubusercontent.com/haccer/subjack/master/fingerprints.json"
+            # The original haccer/subjack fingerprints.json this module was
+            # written against no longer exists upstream (subjack dropped the
+            # separate JSON file entirely). EdOverflow/can-i-take-over-xyz is
+            # the actively-maintained equivalent -- same idea (cname/service/
+            # fingerprint/nxdomain per entry) but 'fingerprint' is a single
+            # string there rather than a list, normalised below.
+            url = "https://raw.githubusercontent.com/EdOverflow/can-i-take-over-xyz/master/fingerprints.json"
             res = self.sf.fetchUrl(url, useragent="SpiderFoot")
 
-            if res['content'] is None:
-                self.error(f"Unable to fetch {url}")
+            if res['content'] is None or res.get('code') != '200':
+                self.error(f"Unable to fetch {url} (HTTP {res.get('code')})")
                 self.errorState = True
                 return
 
-            self.sf.cachePut("subjack-fingerprints", res['content'])
+            self.sf.cachePut("can-i-take-over-xyz-fingerprints", res['content'])
             content = res['content']
 
         try:
@@ -68,6 +82,16 @@ class sfp_subdomain_takeover(SpiderFootPlugin):
                 f"Unable to parse subdomain takeover fingerprints list: {e}")
             self.errorState = True
             return
+
+        # Normalise 'fingerprint' to always be a list: the current source
+        # stores a single string there, but the rest of this module expects
+        # to iterate over a list of candidate fingerprint substrings.
+        for entry in self.fingerprints:
+            fp = entry.get("fingerprint")
+            if isinstance(fp, str):
+                entry["fingerprint"] = [fp]
+            elif fp is None:
+                entry["fingerprint"] = []
 
     # What events is this module interested in for input
     def watchedEvents(self):

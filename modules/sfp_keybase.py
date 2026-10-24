@@ -119,8 +119,13 @@ class sfp_keybase(SpiderFootPlugin):
         code = status.get('code')
 
         if code != 0:
-            self.error(
-                f"Unexpected JSON response code reply from Keybase: {code}")
+            # Non-zero codes here are routine Keybase input-validation
+            # responses (e.g. 100 "bad list value", 205 "not found", 219
+            # "invalid name") for candidate usernames auto-derived from
+            # other modules' output -- most of them will never be real
+            # Keybase usernames. That's expected, not an application error.
+            self.debug(
+                f"No Keybase match (code {code}: {status.get('desc')})")
             return None
 
         them = content.get('them')

@@ -93,6 +93,19 @@ class WebUiHelpers:
             data = dbh.search(criteria)
         except Exception:
             return retdata
+        # dbh.search() returns (generated, data, source_data, module, type,
+        # confidence, visibility, risk, hash, source_event_hash, event_descr,
+        # event_type, scan_instance_id, false_positive, parent_false_positive)
+        # -- searchResults() in scaninfo.tmpl reads output[0]=lastseen,
+        # [1]=data, [2]=source data, [3]=source module, [8]=type. This used
+        # to index past the end of dbh.search()'s row (up to row[14] against
+        # a 9-column result), so every search with any matching data raised
+        # IndexError, silently caught by search()'s bare except and returned
+        # as an empty result. NOTE: scansearchresultexport()'s CSV/Excel
+        # export expects a different 9-column order ("Date, Type, Value,
+        # Source, Module, Risk, FP, Correlation, EventId") that this row
+        # shape does NOT match -- a separate, pre-existing inconsistency
+        # between the two consumers of this method, not introduced here.
         for row in data:
             lastseen = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(row[0]))
@@ -100,6 +113,5 @@ class WebUiHelpers:
             escapeddata = html.escape(row[1])
             escapedsrc = html.escape(row[2])
             retdata.append([lastseen, escapeddata, escapedsrc,
-                            row[3], row[5], row[6], row[7], row[8], row[10],
-                            row[11], row[4], row[13], row[14]])
+                            row[3], row[9], row[5], row[6], row[7], row[4]])
         return retdata

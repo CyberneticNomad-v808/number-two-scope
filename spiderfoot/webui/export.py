@@ -207,7 +207,7 @@ class ExportEndpoints:
         if not id:
             return None
         dbh = SpiderFootDb(self.config)
-        data = dbh.scanResultEvent(id, filterFp=True)
+        data = dbh.scanResultEventForGraph(id, filterFp=True)
         scan = dbh.scanInstanceGet(id)
         if not scan:
             return None
@@ -236,7 +236,7 @@ class ExportEndpoints:
             scan = dbh.scanInstanceGet(id)
             if not scan:
                 continue
-            data = data + dbh.scanResultEvent(id, filterFp=True)
+            data = data + dbh.scanResultEventForGraph(id, filterFp=True)
         if not data:
             return None
         if gexf == "0":

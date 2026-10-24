@@ -612,7 +612,9 @@ class SpiderFootHelpers():
         for building graphs in various formats.
 
         Args:
-            data (list[str]): Scan result as list
+            data (list[str]): Scan result rows as returned by
+                SpiderFootDb.scanResultEventForGraph() -- each row is
+                (data, parent_data, type, event_type_category, hash).
             flt (list[str]): List of event types to include. If not set everything is included.
 
         Returns:
@@ -637,6 +639,11 @@ class SpiderFootHelpers():
 
             ret: typing.List[str] = list()
 
+            if item not in parents:
+                # 'ROOT' (or any other terminal sentinel with no event of
+                # its own) has no further ancestry to walk up.
+                return ret
+
             for [parent, entity_id] in parents[item]:
                 if entity_id in pids:
                     continue
@@ -653,20 +660,22 @@ class SpiderFootHelpers():
         parents: typing.Dict[str, typing.List[typing.List[str]]] = dict()
 
         for row in data:
-            if len(row) != 15:
-                raise ValueError(f"data row length is {len(row)}; expected 15")
+            if len(row) != 5:
+                raise ValueError(f"data row length is {len(row)}; expected 5")
 
-            if row[11] == "ENTITY" or row[11] == "INTERNAL":
+            entity_data, parent_data, event_type, event_category, event_id = row
+
+            if event_category == "ENTITY" or event_category == "INTERNAL":
                 # List of all valid entity values
                 if len(flt) > 0:
-                    if row[4] in flt or row[11] == "INTERNAL":
-                        entities[row[1]] = True
+                    if event_type in flt or event_category == "INTERNAL":
+                        entities[entity_data] = True
                 else:
-                    entities[row[1]] = True
+                    entities[entity_data] = True
 
-            if row[1] not in parents:
-                parents[row[1]] = list()
-            parents[row[1]].append([row[2], row[8]])
+            if entity_data not in parents:
+                parents[entity_data] = list()
+            parents[entity_data].append([parent_data, event_id])
 
         for entity in entities:
             for [parent, _id] in parents[entity]:

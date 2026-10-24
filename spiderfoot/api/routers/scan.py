@@ -495,7 +495,7 @@ async def export_scan_viz(scan_id: str, gexf: str = "0", api_key: str = Depends(
     """Export entities from scan results for visualising (GEXF/graph)."""
     config = get_app_config()
     dbh = SpiderFootDb(config.get_config())
-    data = dbh.scanResultEvent(scan_id, filterFp=True)
+    data = dbh.scanResultEventForGraph(scan_id, filterFp=True)
     scan = dbh.scanInstanceGet(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -532,7 +532,7 @@ async def export_scan_viz_multi(ids: str, gexf: str = "1", api_key: str = Depend
         scan = dbh.scanInstanceGet(scan_id)
         if not scan:
             continue
-        data += dbh.scanResultEvent(scan_id, filterFp=True)
+        data += dbh.scanResultEventForGraph(scan_id, filterFp=True)
         roots.append(scan[1])
         scan_name = scan[0]
     if not data:

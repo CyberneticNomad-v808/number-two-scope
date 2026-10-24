@@ -357,7 +357,21 @@ class ScanEndpoints:
         retdata = []
         dbh = SpiderFootDb(self.config)
         try:
-            data = dbh.scanResultEvent(id, eventType, filterfp, correlationId)
+            # Was calling scanResultEvent(id, eventType, filterfp,
+            # correlationId) positionally, but its actual signature is
+            # (instanceId, eventType, srcModule, data, sourceId,
+            # correlationId, filterFp) -- filterfp landed on srcModule
+            # (a truthy filterfp would filter by module='True'/'1',
+            # matching no real module) and correlationId landed on data
+            # (filtering by data value, not correlation), instead of
+            # either actually reaching the parameters they're named for.
+            # Using keyword args here so this can't silently drift again.
+            data = dbh.scanResultEvent(
+                id,
+                eventType=eventType or 'ALL',
+                filterFp=filterfp,
+                correlationId=correlationId,
+            )
             for row in data:
                 retdata.append(row)
         except Exception:
@@ -864,7 +878,7 @@ class ScanEndpoints:
         dbh = SpiderFootDb(self.config)
         if not id:
             return self.error("No scan id provided.")
-        data = dbh.scanResultEvent(id, filterFp=True)
+        data = dbh.scanResultEventForGraph(id, filterFp=True)
         scan = dbh.scanInstanceGet(id)
         if not scan:
             return self.error("Scan not found.")
@@ -893,7 +907,7 @@ class ScanEndpoints:
         if not ids:
             return self.error("No scan ids provided.")
         for scan_id in ids.split(','):
-            d = dbh.scanResultEvent(scan_id, filterFp=True)
+            d = dbh.scanResultEventForGraph(scan_id, filterFp=True)
             scan = dbh.scanInstanceGet(scan_id)
             if d:
                 data.extend(d)

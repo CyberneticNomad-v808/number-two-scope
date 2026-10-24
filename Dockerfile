@@ -126,6 +126,12 @@ RUN mkdir -p /tools/bin && \
     chmod +x /tools/bin/nuclei && \
     # Nuclei templates
     git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates.git /tools/nuclei-templates && \
+    # Gobuster -- sfp_tool_gobuster.py had no binary at all before this;
+    # its gobuster_path option was unconditionally empty in every deploy.
+    wget -q https://github.com/OJ/gobuster/releases/download/v3.6.0/gobuster_Linux_x86_64.tar.gz && \
+    tar -xzf gobuster_Linux_x86_64.tar.gz -C /tools/bin gobuster && \
+    rm gobuster_Linux_x86_64.tar.gz && \
+    chmod +x /tools/bin/gobuster && \
     # Node.js tools
     npm config set prefix /tools && \
     npm install -g retire && \

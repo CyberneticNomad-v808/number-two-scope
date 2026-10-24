@@ -1,9 +1,11 @@
 import contextlib
+import logging
 import os
 import sys
 import time
+from typing import Any, Generator
+
 import pytest
-import logging
 import threading
 import subprocess
 from pathlib import Path
@@ -16,7 +18,7 @@ required_vars = ['SPIDERFOOT_DB_TYPE', 'SPIDERFOOT_DB_HOST', 'SPIDERFOOT_DB_PORT
 missing = [v for v in required_vars if not os.environ.get(v)]
 if missing:
     raise EnvironmentError(
-        f"Required environment variables not set: {', '.join(missing)}\n"
+        'Required environment variables not set: ' + ', '.join(missing) + '\n'
         "Run tests with: op run --env-file='./.env.test' -- pytest ..."
     )
 
@@ -43,7 +45,12 @@ from test.utils import legacy_test_helpers  # noqa: E402, F401
 class SafeHandler(logging.StreamHandler):
     """A logging handler that suppresses BrokenPipeError and similar issues during xdist termination."""
 
-    def emit(self, record):
+    def emit(self: 'SafeHandler', record: logging.LogRecord) -> None:
+        """Emit a log record, suppressing OS and value errors.
+
+        Args:
+            record: The log record to emit.
+        """
         with contextlib.suppress(OSError, ValueError):
             super().emit(record)
 
@@ -51,7 +58,12 @@ class SafeHandler(logging.StreamHandler):
 class SafeFileHandler(logging.FileHandler):
     """A file handler that suppresses errors during xdist termination."""
 
-    def emit(self, record):
+    def emit(self: 'SafeFileHandler', record: logging.LogRecord) -> None:
+        """Emit a log record, suppressing OS and value errors.
+
+        Args:
+            record: The log record to emit.
+        """
         with contextlib.suppress(OSError, ValueError):
             super().emit(record)
 
@@ -61,7 +73,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        SafeFileHandler("pytest-debug.log"),
+        SafeFileHandler('pytest-debug.log'),
         SafeHandler()
     ]
 )
@@ -70,16 +82,25 @@ logging.basicConfig(
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_runtest_protocol(item, nextitem):
+def pytest_runtest_protocol(item: Any, nextitem: Any) -> bool:
+    """Track test execution timing and thread state.
+
+    Args:
+        item: The test item being run.
+        nextitem: The next test item to run.
+
+    Returns:
+        True to indicate the hook handled the protocol.
+    """
     start_time = time.time()
 
     # Use safe logging
     with contextlib.suppress(OSError, ValueError):
-        logging.info(f"Starting test: {item.nodeid}")
+        logging.info('Starting test: %s', item.nodeid)
 
         # Show active threads at start
         active_threads = threading.enumerate()
-        logging.info(f"Active threads before test ({len(active_threads)}): {[t.name for t in active_threads]}")
+        logging.info('Active threads before test (%d): %s', len(active_threads), [t.name for t in active_threads])
 
     # Run the test normally
     runtestprotocol(item, nextitem=nextitem)
@@ -88,30 +109,35 @@ def pytest_runtest_protocol(item, nextitem):
     with contextlib.suppress(OSError, ValueError):
         # Show threads after test completion
         active_threads = threading.enumerate()
-        logging.info(f"Active threads after test ({len(active_threads)}): {[t.name for t in active_threads]}")
+        logging.info('Active threads after test (%d): %s', len(active_threads), [t.name for t in active_threads])
 
         # Show elapsed time
         elapsed = time.time() - start_time
-        logging.info(f"Completed test: {item.nodeid} ({elapsed:.2f}s)")
+        logging.info('Completed test: %s (%.2fs)', item.nodeid, elapsed)
 
     return True
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_configure(config):
+def pytest_configure(config: Any) -> None:
+    """Configure pytest with global timeout.
+
+    Args:
+        config: The pytest config object.
+    """
     # Only start timeout if not already configured and not in xdist worker
     if not hasattr(config, '_timeout_started') and not hasattr(config, 'workerinput'):
         config._timeout_started = True
         start_global_timeout()
 
 
-def start_global_timeout():
+def start_global_timeout() -> None:
     """Create a global timeout thread with safe error handling."""
-    def timeout_thread():
-        time.sleep(1800)  # 30-minute global timeout
+    def timeout_thread() -> None:
+        time.sleep(7200)  # 2-hour global timeout (2900+ tests with 30s per-test timeout)
         with contextlib.suppress(Exception):
             # Use print instead of logging to avoid closed file issues
-            print("Global timeout exceeded. Terminating test run.", file=sys.stderr, flush=True)
+            print('Global timeout exceeded. Terminating test run.', file=sys.stderr, flush=True)
         os._exit(1)
 
     # Explicitly set daemon to True to ensure it doesn't prevent shutdown
@@ -123,7 +149,12 @@ def start_global_timeout():
 
 
 @pytest.fixture(autouse=True)
-def check_resource_leaks():
+def check_resource_leaks() -> Generator[None, None, None]:
+    """Check for resource leaks after each test.
+
+    Yields:
+        None: Control to the test function.
+    """
     # Record initial state
     starting_threads = set(threading.enumerate())
 
@@ -140,15 +171,23 @@ def check_resource_leaks():
     if new_threads:
         thread_names = [t.name for t in new_threads if t.is_alive() and not t.daemon]
         if thread_names:  # Only report non-daemon threads
-            logging.warning(f"Potential thread leak detected: {thread_names}")
+            logging.warning('Potential thread leak detected: %s', thread_names)
 
 
 @pytest.fixture(autouse=True)
-def default_options(request):
+def default_options(request: Any) -> Generator[None, None, None]:
+    """Set up default options for test classes.
+
+    Args:
+        request: The pytest request fixture.
+
+    Yields:
+        None: Control to the test function.
+    """
     # Ensure modules directory exists and is accessible
-    modules_dir = PROJECT_ROOT / "modules"
+    modules_dir = PROJECT_ROOT / 'modules'
     if not modules_dir.exists():
-        pytest.fail(f"Modules directory not found: {modules_dir}")
+        pytest.fail('Modules directory not found: ' + str(modules_dir))
 
     # Only set default_options if running in a class context
     if hasattr(request, 'cls') and request.cls is not None:
@@ -158,7 +197,7 @@ def default_options(request):
         db_host = os.environ['SPIDERFOOT_DB_HOST']
         db_port = os.environ['SPIDERFOOT_DB_PORT']
         db_name = os.environ['SPIDERFOOT_DB_NAME']
-        dsn = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+        dsn = 'postgresql://' + db_user + ':' + db_pass + '@' + db_host + ':' + db_port + '/' + db_name
 
         request.cls.default_options = {
             '_debug': False,
@@ -169,7 +208,7 @@ def default_options(request):
             '_fetchtimeout': 5,
             '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
             '_internettlds_cache': 72,
-            '_genericusers': ",".join(SpiderFootHelpers.usernamesFromWordlists(['generic-usernames'])),
+            '_genericusers': ','.join(SpiderFootHelpers.usernamesFromWordlists(['generic-usernames'])),
             # PostgreSQL-only: use DSN format from env
             '__database': dsn,
             '__dbtype': 'postgresql',
@@ -185,18 +224,18 @@ def default_options(request):
         }
         request.cls.web_default_options = {'root': '/'}
         request.cls.cli_default_options = {
-            "cli.debug": False,
-            "cli.silent": False,
-            "cli.color": True,
-            "cli.output": "pretty",
-            "cli.history": True,
-            "cli.history_file": "",
-            "cli.spool": False,
-            "cli.spool_file": "",
-            "cli.ssl_verify": True,
-            "cli.username": "",
-            "cli.password": "",
-            "cli.server_baseurl": "http://127.0.0.1:5001"
+            'cli.debug': False,
+            'cli.silent': False,
+            'cli.color': True,
+            'cli.output': 'pretty',
+            'cli.history': True,
+            'cli.history_file': '',
+            'cli.spool': False,
+            'cli.spool_file': '',
+            'cli.ssl_verify': True,
+            'cli.username': '',
+            'cli.password': '',
+            'cli.server_baseurl': 'http://127.0.0.1:5001'
         }
     # For function-based tests, do nothing (or set module-level if needed)
     yield
@@ -204,67 +243,89 @@ def default_options(request):
 # Force cleanup of lingering resources
 
 
-@pytest.fixture(autouse=True, scope="session")
-def recreate_test_database(request):
-    """Drop and recreate the test database before running tests."""
+@pytest.fixture(autouse=True, scope='session')
+def recreate_test_database(request: Any) -> Generator[None, None, None]:
+    """Drop and recreate the test database before running tests.
+
+    Args:
+        request: The pytest request fixture.
+
+    Yields:
+        None: Control to the test session.
+
+    Raises:
+        subprocess.CalledProcessError: If database operations fail.
+    """
     # Only run in master process, not in xdist workers
     if hasattr(request.config, 'workerinput'):
         yield
         return
-    
+
     db_name = os.environ.get('SPIDERFOOT_DB_NAME', 'spiderfoot_test')
-    db_owner = os.environ.get('SPIDERFOOT_DB_USER', 'spiderfoot_test')
-    
+    db_owner = os.environ.get('SPIDERFOOT_DB_USER', 'spiderfoot')
+
     try:
+        # Terminate all active connections to the test database before dropping
+        subprocess.run(
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-c',
+             "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='" + db_name + "' AND pid <> pg_backend_pid();"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
         # Drop existing database
         subprocess.run(
-            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-c', f'DROP DATABASE IF EXISTS {db_name};'],
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-c', 'DROP DATABASE IF EXISTS ' + db_name + ';'],
             check=True,
             capture_output=True,
             text=True
         )
         # Create fresh database with test user as owner
         subprocess.run(
-            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-c', f'CREATE DATABASE {db_name} OWNER {db_owner};'],
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-c', 'CREATE DATABASE ' + db_name + ' OWNER ' + db_owner + ';'],
             check=True,
             capture_output=True,
             text=True
         )
         # Grant all privileges on database to test user
         subprocess.run(
-            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', f'GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {db_owner};'],
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', 'GRANT ALL PRIVILEGES ON DATABASE ' + db_name + ' TO ' + db_owner + ';'],
             check=True,
             capture_output=True,
             text=True
         )
         # Change public schema owner to test user to ensure CREATE permissions
         subprocess.run(
-            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', f'ALTER SCHEMA public OWNER TO {db_owner};'],
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', 'ALTER SCHEMA public OWNER TO ' + db_owner + ';'],
             check=True,
             capture_output=True,
             text=True
         )
         # Grant explicit permissions on public schema
         subprocess.run(
-            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', f'GRANT ALL PRIVILEGES ON SCHEMA public TO {db_owner};'],
+            ['docker', 'exec', 'unified-postgres', 'psql', '-U', 'postgres', '-d', db_name, '-c', 'GRANT ALL PRIVILEGES ON SCHEMA public TO ' + db_owner + ';'],
             check=True,
             capture_output=True,
             text=True
         )
-        logging.info(f"Recreated test database: {db_name}")
+        logging.info('Recreated test database: %s', db_name)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to recreate test database: {e.stderr}")
+        logging.error('Failed to recreate test database: %s', e.stderr)
         raise
-    
+
     yield
 
 
-@pytest.fixture(autouse=True, scope="session")
-def session_cleanup():
+@pytest.fixture(autouse=True, scope='session')
+def session_cleanup() -> Generator[None, None, None]:
+    """Clean up resources at the end of the test session.
+
+    Yields:
+        None: Control to the test session.
+    """
     yield
     # Force cleanup at end of session - critical to prevent xdist communication errors
     import gc
-    import threading
 
     # Force garbage collection
     gc.collect()
@@ -285,17 +346,15 @@ def session_cleanup():
 
     # CRITICAL: Shutdown logging system BEFORE xdist tries to close communication pipes
     # This prevents BrokenPipeError and "I/O operation on closed file" errors
-    with contextlib.suppress(Exception):
-        # First, try to log completion if logging is still available
-        with contextlib.suppress(ValueError, OSError, BrokenPipeError):
-            # Only log if we can safely write to handlers
-            root_logger = logging.getLogger()
-            if root_logger.handlers:
-                for handler in root_logger.handlers[:]:  # Copy list to avoid modification during iteration
-                    with contextlib.suppress(ValueError, OSError, AttributeError):
-                        if hasattr(handler, 'stream') and not handler.stream.closed:
-                            logging.info("Session cleanup completed")
-                        break  # Only log once if we can
+    with contextlib.suppress(Exception, ValueError, OSError, BrokenPipeError):
+        # Only log if we can safely write to handlers
+        root_logger = logging.getLogger()
+        if root_logger.handlers:
+            for handler in root_logger.handlers[:]:  # Copy list to avoid modification during iteration
+                with contextlib.suppress(ValueError, OSError, AttributeError):
+                    if hasattr(handler, 'stream') and not handler.stream.closed:
+                        logging.info('Session cleanup completed')
+                    break  # Only log once if we can
 
     # Now shutdown the logging system to clean up handlers and streams
     with contextlib.suppress(Exception):

@@ -15,15 +15,12 @@ import ssl
 import requests
 import OpenSSL
 import cryptography
-import dns.resolver
 import urllib.parse
-import time
 import random
-import inspect
 from cryptography.hazmat.backends.openssl import backend
-from spiderfoot import SpiderFootHelpers
 from .helpers import validIP, validIP6
 from datetime import datetime, timezone
+
 
 def resolveHost(host: str) -> list:
     """Return a normalised IPv4 resolution of a hostname.
@@ -51,6 +48,7 @@ def resolveHost(host: str) -> list:
         return []
     return list(set(addrs))
 
+
 def resolveIP(ipaddr: str) -> list:
     """Return a normalised resolution of an IPv4 or IPv6 address as a flat list (not a tuple)."""
     import socket
@@ -64,6 +62,7 @@ def resolveIP(ipaddr: str) -> list:
     if not addrs:
         return []
     return list(set(addrs))
+
 
 def resolveHost6(hostname: str) -> list:
     """Return IPv6 addresses for a hostname.
@@ -88,6 +87,7 @@ def resolveHost6(hostname: str) -> list:
         return []
     return list(set(addrs))
 
+
 def validateIP(host: str, ip: str) -> bool:
     if not host:
         return False
@@ -102,10 +102,12 @@ def validateIP(host: str, ip: str) -> bool:
         return False
     return any(str(addr) == ip for addr in addrs)
 
+
 def safeSocket(host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
     sock = socket.create_connection((host, int(port)), int(timeout))
     sock.settimeout(int(timeout))
     return sock
+
 
 def safeSSLSocket(host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
     context = ssl.create_default_context()
@@ -116,6 +118,7 @@ def safeSSLSocket(host: str, port: int, timeout: int) -> 'ssl.SSLSocket':
     sock = context.wrap_socket(s, server_hostname=host)
     sock.do_handshake()
     return sock
+
 
 def parseCert(rawcert: str, fqdn: str = None, expiringdays: int = 30) -> dict:
     if not rawcert:
@@ -164,6 +167,7 @@ def parseCert(rawcert: str, fqdn: str = None, expiringdays: int = 30) -> dict:
             ret['mismatch'] = True
     return ret
 
+
 def getSession() -> 'requests.sessions.Session':
     """Return requests session object.
 
@@ -177,14 +181,24 @@ def getSession() -> 'requests.sessions.Session':
     session = requests.session()
     return session
 
+
+def _default_url_fqdn(u):
+    return u
+
+
+def _default_is_local(ip):
+    return False
+
+
 def useProxyForUrl(url: str, opts=None, urlFQDN=None, isValidLocalOrLoopbackIp=None) -> bool:
     if opts is None:
         return False
     if urlFQDN is None:
-        urlFQDN = lambda u: u
+        urlFQDN = _default_url_fqdn
     if isValidLocalOrLoopbackIp is None:
-        isValidLocalOrLoopbackIp = lambda ip: False
-    host = urlFQDN(url).lower()
+        isValidLocalOrLoopbackIp = _default_is_local
+    fqdn = urlFQDN(url)
+    host = fqdn.lower() if fqdn is not None else ''
     if not opts.get('_socks1type'):
         return False
     proxy_host = opts.get('_socks2addr')
@@ -205,6 +219,7 @@ def useProxyForUrl(url: str, opts=None, urlFQDN=None, isValidLocalOrLoopbackIp=N
         if isValidLocalOrLoopbackIp(host):
             return False
     return True
+
 
 def fetchUrl(url: str, cookies: str = None, timeout: int = 30, useragent: str = "SpiderFoot", headers: dict = None, noLog: bool = False, postData: str = None, disableContentEncoding: bool = False, sizeLimit: int = None, headOnly: bool = False, verify: bool = True, proxies: dict = None) -> dict:
     """Fetch URL content with proxy support.

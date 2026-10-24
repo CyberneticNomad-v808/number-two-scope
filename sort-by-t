@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Sort JSONL file by "t" field (service name)
+# Usage: cat file.jsonl | sort-by-t
+#        sort-by-t < file.jsonl
+#        sort-by-t file.jsonl
+
+set -euo pipefail
+
+if [[ $# -gt 0 ]]; then
+    # File argument provided
+    jq -s -c 'sort_by(.t)[]' "$@"
+else
+    # Read from stdin
+    jq -s -c 'sort_by(.t)[]'
+fi

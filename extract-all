@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Process multiple 1Password JSON files in parallel
+# Usage: extract-all file1.json file2.json file3.json ...
+#        extract-all *.json
+
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $0 <file1.json> <file2.json> ..." >&2
+    exit 1
+fi
+
+# Process each file in parallel
+for file in "$@"; do
+    if [[ ! -f "$file" ]]; then
+        echo "Error: File not found: $file" >&2
+        continue
+    fi
+
+    # Generate output filename: input.json -> input.jsonl
+    output="${file%.json}.jsonl"
+
+    # Run in background
+    (
+        echo "Processing: $file -> $output"
+        ./extract-t "$file" > "$output"
+        echo "✓ Completed: $output"
+    ) &
+done
+
+# Wait for all background jobs to complete
+wait
+
+echo "All files processed!"

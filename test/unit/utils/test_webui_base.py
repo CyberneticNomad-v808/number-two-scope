@@ -35,7 +35,7 @@ class WebUITimeoutError(Exception):
     pass
 
 
-def with_timeout(timeout_seconds=30):
+def with_timeout(timeout_seconds: int = 30) -> object:
     """
     Decorator that enforces a timeout on test methods.
     
@@ -45,13 +45,13 @@ def with_timeout(timeout_seconds=30):
     Returns:
         function: Decorated function with timeout protection
     """
-    def decorator(func):
+    def decorator(func: object) -> object:
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self: object, *args: object, **kwargs: object) -> object:
             result_queue = queue.Queue()
             exception_queue = queue.Queue()
             
-            def target():
+            def target() -> None:
                 try:
                     result = func(self, *args, **kwargs)
                     result_queue.put(result)
@@ -65,7 +65,7 @@ def with_timeout(timeout_seconds=30):
             if test_thread.is_alive():
                 # Force cleanup on timeout
                 self._force_cleanup()
-                raise WebUITimeoutError(f"Test {func.__name__} timed out after {timeout_seconds} seconds")
+                raise WebUITimeoutError('Test ' + func.__name__ + ' timed out after ' + str(timeout_seconds) + ' seconds')
             
             # Check for exceptions
             if not exception_queue.empty():
@@ -84,13 +84,13 @@ def with_timeout(timeout_seconds=30):
 class ThreadReaper:
     """Aggressive thread and resource cleanup utility."""
     
-    def __init__(self):
+    def __init__(self: 'ThreadReaper') -> None:
         self.registered_threads = set()
         self.registered_sockets = []
         self.registered_servers = []
         self.initial_thread_count = threading.active_count()
     
-    def register_thread(self, thread):
+    def register_thread(self: 'ThreadReaper', thread: object) -> None:
         """Register a thread for cleanup.
         
         Args:
@@ -98,7 +98,7 @@ class ThreadReaper:
         """
         self.registered_threads.add(thread)
     
-    def register_socket(self, socket_obj):
+    def register_socket(self: 'ThreadReaper', socket_obj: object) -> None:
         """Register a socket for cleanup.
         
         Args:
@@ -106,7 +106,7 @@ class ThreadReaper:
         """
         self.registered_sockets.append(socket_obj)
     
-    def register_server(self, server):
+    def register_server(self: 'ThreadReaper', server: object) -> None:
         """Register a server for cleanup.
         
         Args:
@@ -114,7 +114,7 @@ class ThreadReaper:
         """
         self.registered_servers.append(server)
     
-    def cleanup_all(self, force=False):
+    def cleanup_all(self: 'ThreadReaper', force: bool = False) -> None:
         """Perform aggressive cleanup of all registered resources.
         
         Args:
@@ -149,7 +149,7 @@ class ThreadReaper:
         if force:
             self._force_thread_cleanup()
     
-    def _force_thread_cleanup(self):
+    def _force_thread_cleanup(self: 'ThreadReaper') -> None:
         """Force cleanup of all non-daemon threads."""
         current_threads = threading.enumerate()
         for thread in current_threads:
@@ -162,7 +162,7 @@ class ThreadReaper:
 class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
     """Enhanced base class for web UI tests with robust resource management."""
     
-    def setUp(self):
+    def setUp(self: 'EnhancedWebUITestBase') -> None:
         """Enhanced setup with resource tracking."""
         super().setUp()
         self.thread_reaper = ThreadReaper()
@@ -176,7 +176,7 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
         # Mock database and logging to avoid real resources
         self._setup_mocks()
     
-    def _setup_mocks(self):
+    def _setup_mocks(self: 'EnhancedWebUITestBase') -> None:
         """Setup common mocks to avoid real resource allocation."""
         # NOTE: psycopg2.connect is already mocked in conftest.py BEFORE any imports
         # This ensures DbCore.__init__ never attempts a real database connection
@@ -184,16 +184,20 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
         self.db_patcher = patch('sfwebui.SpiderFootDb')
         self.sf_patcher = patch('sfwebui.SpiderFoot')
         self.log_patcher = patch('sfwebui.logListenerSetup')
+        self.routes_db_patcher = patch('spiderfoot.webui.routes.SpiderFootDb')
+        self.routes_sf_patcher = patch('spiderfoot.webui.routes.SpiderFoot')
 
         self.mock_db = self.db_patcher.start()
         self.mock_sf = self.sf_patcher.start()
         self.mock_log = self.log_patcher.start()
+        self.mock_routes_db = self.routes_db_patcher.start()
+        self.mock_routes_sf = self.routes_sf_patcher.start()
 
         # Configure mock database instance
         self.mock_db_instance = MagicMock()
         self.mock_db.return_value = self.mock_db_instance
     
-    def _get_open_connections(self):
+    def _get_open_connections(self: 'EnhancedWebUITestBase') -> int:
         """Get current open network connections.
         
         Returns:
@@ -207,7 +211,7 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
         except Exception:
             return 0
     
-    def _force_cleanup(self):
+    def _force_cleanup(self: 'EnhancedWebUITestBase') -> None:
         """Force aggressive cleanup of all resources."""
         # Stop CherryPy engine
         with suppress(Exception):
@@ -229,7 +233,7 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
         # Close any remaining sockets
         self._close_dangling_sockets()
     
-    def _close_dangling_sockets(self):
+    def _close_dangling_sockets(self: 'EnhancedWebUITestBase') -> None:
         """Close any sockets that might be keeping ports bound."""
         if not HAS_PSUTIL:
             return
@@ -245,7 +249,7 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
         except Exception:
             pass
     
-    def tearDown(self):
+    def tearDown(self: 'EnhancedWebUITestBase') -> None:
         """Enhanced teardown with aggressive resource cleanup."""
         # Stop mocks
         with suppress(Exception):
@@ -254,16 +258,20 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
             self.sf_patcher.stop()
         with suppress(Exception):
             self.log_patcher.stop()
-        
+        with suppress(Exception):
+            self.routes_db_patcher.stop()
+        with suppress(Exception):
+            self.routes_sf_patcher.stop()
+
         # Force cleanup
         self._force_cleanup()
-        
+
         # Wait for threads to finish
         self._wait_for_threads_cleanup()
-        
+
         super().tearDown()
     
-    def _wait_for_threads_cleanup(self, timeout=5):
+    def _wait_for_threads_cleanup(self: 'EnhancedWebUITestBase', timeout: int = 5) -> None:
         """Wait for threads to finish cleanup.
         
         Args:
@@ -283,21 +291,24 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
             
             time.sleep(0.1)
     
-    def log_system_state(self, test_name):
+    def log_system_state(self: 'EnhancedWebUITestBase', test_name: str) -> None:
         """Log detailed system state for debugging timeouts.
         
         Args:
             test_name (str): Name of the test for logging context
         """
-        print(f"\n{'='*60}")
-        print(f"DIAGNOSTIC: {test_name} - System State")
-        print(f"{'='*60}")
+        print('\n' + '=' * 60)
+        print('DIAGNOSTIC: ' + test_name + ' - System State')
+        print('=' * 60)
         
         # Thread information
         threads = threading.enumerate()
-        print(f"Active threads: {len(threads)}")
+        print('Active threads: ' + str(len(threads)))
         for thread in threads:
-            print(f"  - {thread.name} (daemon={thread.daemon}, alive={thread.is_alive()})")
+            print(
+                '  - ' + thread.name
+                + ' (daemon=' + str(thread.daemon)
+                + ', alive=' + str(thread.is_alive()) + ')')
         
         # Process information
         if HAS_PSUTIL:
@@ -305,28 +316,28 @@ class EnhancedWebUITestBase(helper.CPWebCase, TestModuleBase):
                 process = psutil.Process()
                 open_files = process.open_files()
                 connections = process.connections()
-                print("\nProcess info:")
-                print(f"  - Open files: {len(open_files)}")
-                print(f"  - Open connections: {len(connections)}")
-                print(f"  - Threads: {process.num_threads()}")
+                print('\nProcess info:')
+                print('  - Open files: ' + str(len(open_files)))
+                print('  - Open connections: ' + str(len(connections)))
+                print('  - Threads: ' + str(process.num_threads()))
                 
                 # Port binding check
                 listening_ports = [conn for conn in connections if conn.status == 'LISTEN']
                 for conn in listening_ports:
-                    print(f"  - Listening on: {conn.laddr}")
+                    print('  - Listening on: ' + str(conn.laddr))
             except Exception as e:
-                print(f"  - Error getting process info: {e}")
+                print('  - Error getting process info: ' + str(e))
         else:
-            print("\nProcess info: (psutil not available)")
+            print('\nProcess info: (psutil not available)')
         
-        print(f"{'='*60}\n")
+        print('=' * 60 + '\n')
 
 
-def ensure_platform_socket_cleanup():
+def ensure_platform_socket_cleanup() -> None:
     """Platform-specific socket cleanup to prevent port binding issues."""
     import platform
     
-    if platform.system() == "Windows":
+    if platform.system() == 'Windows':
         # Windows-specific cleanup
         with suppress(Exception):
             import subprocess

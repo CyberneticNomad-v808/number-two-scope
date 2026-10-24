@@ -3,10 +3,10 @@
 # Name:         sfwebui wrapper
 # Purpose:      Web User interface class for use with a web browser
 #
-# Author:       Agostino Panico poppopjmp 
+# Author:       Agostino Panico poppopjmp
 #
 # Created:      03/07/2025
-# Copyright:    (c) Agostino Panico poppopjmp 
+# Copyright:    (c) Agostino Panico poppopjmp
 # License:      MIT
 # -----------------------------------------------------------------
 
@@ -22,21 +22,18 @@ from spiderfoot.security_middleware import install_cherrypy_security
 from spiderfoot.secure_config import SecureConfigManager
 
 # Template and UI imports
-from mako.template import Template
+from mako.template import Template  # noqa: F401 - re-exported for submodules
 from mako.lookup import TemplateLookup
 
 # Data processing imports
-import openpyxl
-from io import BytesIO, StringIO
+from io import BytesIO, StringIO  # noqa: F401 - re-exported for submodules
 
 # System imports
 import multiprocessing as mp
 import time
-import json
 import logging
 import os
 import sys
-from copy import deepcopy
 from typing import Dict, List, Optional, Any, Union
 
 # Web framework imports
@@ -58,21 +55,21 @@ from spiderfoot.webui.export import ExportEndpoints
 class SpiderFootWebUi(WebUiRoutes):
     """
     Backward compatibility class that provides all methods in one place.
-    
+
     This class inherits from WebUiRoutes which already aggregates all endpoint classes
     to maintain full backward compatibility with legacy code while providing
     a clean, modular architecture.
     """
-    
+
     def __init__(self, web_config: Dict[str, Any], config: Dict[str, Any], loggingQueue: Optional[mp.Queue] = None):
         """
         Initialize the SpiderFoot Web UI.
-        
+
         Args:
             web_config: Web server configuration (interface, port, root path)
             config: SpiderFoot configuration dictionary
             loggingQueue: Optional logging queue for multiprocessing
-            
+
         Raises:
             TypeError: If config arguments are not dictionaries
             ValueError: If config arguments are empty or invalid
@@ -82,18 +79,18 @@ class SpiderFootWebUi(WebUiRoutes):
             raise TypeError(f"config is {type(config)}; expected dict()")
         if not config:
             raise ValueError("config is empty")
-            
+
         if not isinstance(web_config, dict):
             raise TypeError(f"web_config is {type(web_config)}; expected dict()")
         if not web_config:
             raise ValueError("web_config is empty")
-        
+
         # Initialize parent class which handles all the endpoint setup
         super().__init__(web_config, config, loggingQueue)
-        
+
         # Initialize secure configuration manager
         self.secure_config = SecureConfigManager(config)
-        
+
         # Install security middleware for CherryPy
         try:
             self.security_middleware = install_cherrypy_security(config)
@@ -102,20 +99,17 @@ class SpiderFootWebUi(WebUiRoutes):
             self.log.error(f"Failed to install security middleware: {e}")
             # Continue without security middleware (fallback mode)
             self.security_middleware = None
-        
+
         # Validate configuration with enhanced defaults
         self._validate_configuration()
-        
+
         # Set up additional security headers if available
         self._setup_additional_security_headers()
-        
+
         self.log.info("SpiderFootWebUi initialized successfully")
-    
-    
+
     def _validate_configuration(self):
         """Validate the configuration and fix common issues."""
-        import os
-
         try:
             # Validate and set default values for required configuration keys
             required_defaults = {
@@ -132,7 +126,7 @@ class SpiderFootWebUi(WebUiRoutes):
                     self.config[key] = default_value
 
             # Load correlation rules from filesystem if not already loaded
-            self.log.info(f"Checking correlation rules - in config: {'__correlationrules__' in self.config}, value: {len(self.config.get('__correlationrules__', []))} rules")
+            self.log.info(f"Checking correlation rules - in config: {'__correlationrules__' in self.config}, value: {len(self.config.get('__correlationrules__') or [])} rules")
             if '__correlationrules__' not in self.config or not self.config.get('__correlationrules__'):
                 self.log.info("Loading correlation rules from filesystem...")
                 try:
@@ -163,7 +157,7 @@ class SpiderFootWebUi(WebUiRoutes):
                 except Exception as e:
                     self.log.error(f"Failed to load correlation rules: {e}", exc_info=True)
                     self.config['__correlationrules__'] = []
-            
+
             # Validate modules structure - ensure it's a dict
             if '__modules__' in self.config:
                 modules = self.config['__modules__']
@@ -206,42 +200,42 @@ class SpiderFootWebUi(WebUiRoutes):
         except Exception as e:
             self.log.error(f"Configuration validation failed: {e}")
             raise
-    
+
     def _setup_additional_security_headers(self):
         """Set up additional security headers if the secure module is available."""
         if not secure:
             self.log.warning("Security headers not available (secure module not installed)")
             return
-            
+
         try:
             # The parent class already sets up basic security headers
             # We can add additional ones here if needed
             self.log.info("Additional security headers configured successfully")
-            
+
         except Exception as e:
             self.log.error(f"Failed to setup additional security headers: {e}")
-    
+
     def validate_scan_id(self, scan_id: str) -> bool:
         """
         Validate a scan ID format and existence.
-        
+
         Args:
             scan_id: Scan identifier to validate
-            
+
         Returns:
             bool: True if valid, False otherwise
         """
         if not scan_id or not isinstance(scan_id, str):
             return False
-            
+
         # Check format (should be hex string)
         if not all(c in '0123456789abcdefABCDEF' for c in scan_id):
             return False
-            
+
         # Check length (typical scan IDs are 32 chars)
         if len(scan_id) != 32:
             return False
-            
+
         # Check if exists in database
         try:
             dbh = self._get_dbh()
@@ -249,33 +243,33 @@ class SpiderFootWebUi(WebUiRoutes):
             return scan_info is not None
         except Exception:
             return False
-    
+
     def validate_workspace_id(self, workspace_id: str) -> bool:
         """
         Validate a workspace ID format and existence.
-        
+
         Args:
             workspace_id: Workspace identifier to validate
-            
+
         Returns:
             bool: True if valid, False otherwise
         """
         if not workspace_id or not isinstance(workspace_id, str):
             return False
-            
+
         try:
             workspace = SpiderFootWorkspace(self.config)
             return workspace.getWorkspace(workspace_id) is not None
         except Exception:
             return False
-    
+
     def sanitize_user_input(self, user_input: Union[str, List[str]]) -> Union[str, List[str]]:
         """
         Sanitize user input to prevent XSS and injection attacks.
-        
+
         Args:
             user_input: String or list of strings to sanitize
-            
+
         Returns:
             Sanitized input
         """
@@ -292,15 +286,15 @@ class SpiderFootWebUi(WebUiRoutes):
         if isinstance(user_input, str):
             return self.cleanUserInput([user_input])[0] if user_input else ""
         return str(user_input) if user_input is not None else ""
-    
+
     def handle_error(self, error_msg: str, error_type: str = "error") -> Dict[str, Any]:
         """
         Standard error handling for API endpoints.
-        
+
         Args:
             error_msg: Error message to log and return
             error_type: Type of error (error, warning, info)
-            
+
         Returns:
             Standardized error response
         """
@@ -310,30 +304,30 @@ class SpiderFootWebUi(WebUiRoutes):
             self.log.warning(error_msg)
         else:
             self.log.info(error_msg)
-            
+
         return {
             'success': False,
             'error': error_msg,
             'error_type': error_type,
             'timestamp': time.time()
         }
-    
+
     def get_system_status(self) -> Dict[str, Any]:
         """
         Get system status information.
-        
+
         Returns:
             System status dictionary
         """
         try:
             dbh = self._get_dbh()
-            
+
             # Get database stats
             scan_count = len(dbh.scanInstanceList())
-            
+
             # Get active scans
             active_scans = [s for s in dbh.scanInstanceList() if s[5] in ['RUNNING', 'STARTING']]
-            
+
             # System info
             status = {
                 'success': True,
@@ -344,30 +338,30 @@ class SpiderFootWebUi(WebUiRoutes):
                 'spiderfoot_version': self.config.get('__version__', 'unknown'),
                 'timestamp': time.time()
             }
-            
+
             return status
-            
+
         except Exception as e:
             return self.handle_error(f"Failed to get system status: {e}")
-    
+
     def cleanup_old_scans(self, retention_days: int = 30) -> Dict[str, Any]:
         """
         Clean up old scan data based on retention policy.
-        
+
         Args:
             retention_days: Number of days to retain scans
-            
+
         Returns:
             Cleanup result
         """
         try:
             dbh = self._get_dbh()
             cutoff_time = time.time() - (retention_days * 24 * 60 * 60)
-            
+
             # Get old scans
             all_scans = dbh.scanInstanceList()
             old_scans = [s for s in all_scans if s[2] < cutoff_time and s[5] in ['FINISHED', 'ABORTED']]
-            
+
             cleaned_count = 0
             for scan in old_scans:
                 try:
@@ -375,36 +369,36 @@ class SpiderFootWebUi(WebUiRoutes):
                     cleaned_count += 1
                 except Exception as e:
                     self.log.warning(f"Failed to delete scan {scan[0]}: {e}")
-            
+
             return {
                 'success': True,
                 'cleaned_scans': cleaned_count,
                 'total_old_scans': len(old_scans),
                 'retention_days': retention_days
             }
-            
+
         except Exception as e:
             return self.handle_error(f"Failed to cleanup old scans: {e}")
-    
+
     def get_performance_metrics(self) -> Dict[str, Any]:
         """
         Get performance metrics for the system.
-        
+
         Returns:
             Performance metrics dictionary
         """
         try:
             import psutil
-            
+
             # System metrics
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
             disk = psutil.disk_usage('/')
-            
+
             # Database metrics
             dbh = self._get_dbh()
             db_size = os.path.getsize(dbh.conn_path) if hasattr(dbh, 'conn_path') else 0
-            
+
             metrics = {
                 'success': True,
                 'cpu_percent': cpu_percent,
@@ -415,41 +409,41 @@ class SpiderFootWebUi(WebUiRoutes):
                 'database_size': db_size,
                 'timestamp': time.time()
             }
-            
+
             return metrics
-            
+
         except ImportError:
             return self.handle_error("psutil not available for performance metrics", "warning")
         except Exception as e:
             return self.handle_error(f"Failed to get performance metrics: {e}")
-    
+
     def backup_database(self, backup_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a backup of the database.
-        
+
         Args:
             backup_path: Path to save backup (optional)
-            
+
         Returns:
             Backup result
         """
         try:
             import shutil
             from datetime import datetime
-            
-            dbh = self._get_dbh()
-            
+
+            self._get_dbh()
+
             # Generate backup filename if not provided
             if not backup_path:
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 backup_path = f"spiderfoot_backup_{timestamp}.db"
-            
+
             # Get source database path
             source_db = self.config.get('__database', f"{SpiderFootHelpers.dataPath()}/spiderfoot.db")
-            
+
             # Create backup
             shutil.copy2(source_db, backup_path)
-            
+
             # Verify backup
             if os.path.exists(backup_path):
                 backup_size = os.path.getsize(backup_path)
@@ -461,14 +455,14 @@ class SpiderFootWebUi(WebUiRoutes):
                 }
             else:
                 return self.handle_error("Backup file was not created")
-                
+
         except Exception as e:
             return self.handle_error(f"Failed to backup database: {e}")
-    
+
     def health_check(self) -> Dict[str, Any]:
         """
         Perform a comprehensive health check.
-        
+
         Returns:
             Health check results
         """
@@ -477,7 +471,7 @@ class SpiderFootWebUi(WebUiRoutes):
             'timestamp': time.time(),
             'checks': {}
         }
-        
+
         # Database connectivity
         try:
             dbh = self._get_dbh()
@@ -486,14 +480,14 @@ class SpiderFootWebUi(WebUiRoutes):
         except Exception as e:
             health_status['checks']['database'] = {'status': 'ERROR', 'message': str(e)}
             health_status['success'] = False
-        
+
         # Configuration validity
         try:
             required_keys = ['__database', '__modules__']
             missing_keys = [key for key in required_keys if key not in self.config]
             if missing_keys:
                 health_status['checks']['configuration'] = {
-                    'status': 'WARNING', 
+                    'status': 'WARNING',
                     'message': f'Missing configuration keys: {missing_keys}'
                 }
             else:
@@ -501,38 +495,38 @@ class SpiderFootWebUi(WebUiRoutes):
         except Exception as e:
             health_status['checks']['configuration'] = {'status': 'ERROR', 'message': str(e)}
             health_status['success'] = False
-        
+
         # Module availability
         try:
             modules = self.config.get('__modules__', [])
             if modules:
                 health_status['checks']['modules'] = {
-                    'status': 'OK', 
+                    'status': 'OK',
                     'message': f'{len(modules)} modules available'
                 }
             else:
                 health_status['checks']['modules'] = {
-                    'status': 'WARNING', 
+                    'status': 'WARNING',
                     'message': 'No modules configured'
                 }
         except Exception as e:
             health_status['checks']['modules'] = {'status': 'ERROR', 'message': str(e)}
-        
+
         return health_status
 
 
 class SpiderFootWebUiApp:
     """
     Enhanced application wrapper for SpiderFoot Web UI.
-    
+
     This class provides additional functionality for application lifecycle management,
     configuration validation, and system monitoring.
     """
-    
+
     def __init__(self, config: Dict[str, Any], docroot: Optional[str] = None, loggingQueue: Optional[mp.Queue] = None):
         """
         Initialize the SpiderFoot Web UI Application.
-        
+
         Args:
             config: SpiderFoot configuration dictionary
             docroot: Document root path for web server
@@ -540,34 +534,34 @@ class SpiderFootWebUiApp:
         """
         # Configuration validation and setup
         self._validate_and_setup_config(config)
-        
+
         # Web server configuration
         self.docroot = docroot or '/'
-        
+
         # Logging setup
         self._setup_logging(loggingQueue)
-        
+
         # Template engine setup
         self._setup_templates()
-        
+
         # Initialize endpoint classes
         self._initialize_endpoints()
-        
+
         # Security configuration
         self._setup_security()
-        
+
         self.log.info("SpiderFootWebUiApp initialized successfully")
-    
+
     def _validate_and_setup_config(self, config: Dict[str, Any]):
         """Validate and setup configuration with enhanced error checking."""
         from copy import deepcopy
-        
+
         if not isinstance(config, dict) or not config:
             raise ValueError("Invalid configuration provided")
-        
+
         # Create default configuration
         self.defaultConfig = deepcopy(config)
-        
+
         # Initialize database and merge configurations
         try:
             dbh = SpiderFootDb(self.defaultConfig, init=True)
@@ -575,10 +569,10 @@ class SpiderFootWebUiApp:
             self.config = sf.configUnserialize(dbh.configGet(), self.defaultConfig)
         except Exception as e:
             raise RuntimeError(f"Failed to initialize database or configuration: {e}")
-        
+
         # Validate and fix module configuration
         self._fix_module_configuration()
-    
+
     def _fix_module_configuration(self):
         """Fix and validate module configuration."""
         if '__modules__' in self.config:
@@ -591,7 +585,7 @@ class SpiderFootWebUiApp:
                     m if isinstance(m, dict) and 'name' in m else {'name': str(m)}
                     for m in modules
                 ]
-    
+
     def _setup_logging(self, loggingQueue: Optional[mp.Queue]):
         """Setup logging with proper error handling."""
         if loggingQueue is None:
@@ -599,85 +593,83 @@ class SpiderFootWebUiApp:
             logListenerSetup(self.loggingQueue, self.config)
         else:
             self.loggingQueue = loggingQueue
-        
+
         logWorkerSetup(self.loggingQueue)
         self.log = logging.getLogger(f"spiderfoot.{__name__}")
-    
+
     def _setup_templates(self):
         """Setup template lookup with validation."""
         template_dirs = ['spiderfoot/templates']
-        
+
         # Validate template directories exist
         for template_dir in template_dirs:
             if not os.path.exists(template_dir):
                 self.log.warning(f"Template directory not found: {template_dir}")
-        
+
         self.lookup = TemplateLookup(directories=template_dirs)
-    
+
     def _initialize_endpoints(self):
         """Initialize all endpoint classes with enhanced error handling."""
         try:
             # Scan endpoints
             self.scan = ScanEndpoints()
             self._configure_endpoint(self.scan)
-            
+
             # Workspace endpoints
             self.workspace = WorkspaceEndpoints()
             self._configure_endpoint(self.workspace)
-            
+
             # Miscellaneous endpoints
             self.misc = MiscEndpoints()
             self._configure_endpoint(self.misc)
-            
+
             # Info endpoints
             self.info = InfoEndpoints()
             self._configure_endpoint(self.info)
-            
+
             # Settings endpoints
             self.settings = SettingsEndpoints()
             self._configure_endpoint(self.settings)
-            
+
             # Export endpoints
             self.export = ExportEndpoints()
             self._configure_endpoint(self.export)
-            
+
         except Exception as e:
             self.log.error(f"Failed to initialize endpoints: {e}")
             raise
-    
+
     def _configure_endpoint(self, endpoint):
         """Configure an endpoint with common settings."""
         endpoint.config = self.config
         endpoint.docroot = self.docroot
         endpoint.lookup = self.lookup
-        
+
         # Add logging if endpoint supports it
         if hasattr(endpoint, 'log'):
             endpoint.log = self.log
-    
+
     def _setup_security(self):
         """Setup security headers and policies with enhanced configuration."""
         if not secure:
             self.log.warning("Security headers not available (secure module not installed)")
             return
-        
+
         try:
             # Enhanced Content Security Policy
-            csp = (
-                secure.ContentSecurityPolicy()
-                    .default_src("'self'")
-                    .script_src("'self'", "'unsafe-inline'", "blob:", "'unsafe-eval'")
-                    .style_src("'self'", "'unsafe-inline'", "fonts.googleapis.com")
-                    .font_src("'self'", "fonts.gstatic.com")
-                    .base_uri("'self'")
-                    .connect_src("'self'", "data:")
-                    .frame_src("'self'", 'data:')
-                    .img_src("'self'", "data:", "*.gravatar.com")
-                    .media_src("'self'")
-                    .object_src("'none'")
-                    .worker_src("'self'", "blob:")
-            )
-            
+            csp = secure.ContentSecurityPolicy()
+            csp = csp.default_src("'self'")
+            csp = csp.script_src("'self'", "'unsafe-inline'", "blob:", "'unsafe-eval'")
+            csp = csp.style_src("'self'", "'unsafe-inline'", "fonts.googleapis.com")
+            csp = csp.font_src("'self'", "fonts.gstatic.com")
+            csp = csp.base_uri("'self'")
+            csp = csp.connect_src("'self'", "data:")
+            csp = csp.frame_src("'self'", 'data:')
+            csp = csp.img_src("'self'", "data:", "*.gravatar.com")
+            csp = csp.media_src("'self'")
+            csp = csp.object_src("'none'")
+            csp = csp.worker_src("'self'", "blob:")
+
             # Security headers with enhanced configuration
             secure_headers = secure.Secure(
                 server=secure.Server().set("SpiderFoot"),
@@ -687,18 +679,18 @@ class SpiderFootWebUiApp:
                 permissions=secure.PermissionsPolicy().geolocation("none").camera("none").microphone("none"),
                 hsts=secure.StrictTransportSecurity().max_age(31536000).include_subdomains()
             )
-            
+
             # Apply to CherryPy configuration
             cherrypy.config.update({
                 "tools.response_headers.on": True,
                 "tools.response_headers.headers": secure_headers.framework.cherrypy()
             })
-            
+
             self.log.info("Enhanced security headers configured successfully")
-            
+
         except Exception as e:
             self.log.error(f"Failed to setup security headers: {e}")
-    
+
     def mount(self):
         """Mount all endpoints with proper error handling and validation."""
         try:
@@ -709,7 +701,7 @@ class SpiderFootWebUiApp:
             cherrypy.tree.mount(self.settings, '/settings')
             cherrypy.tree.mount(self.export, '/export')
             cherrypy.tree.mount(self.misc, '/')
-            
+
             # Register enhanced error handlers
             cherrypy.config.update({
                 'error_page.401': self._error_page_401,
@@ -717,35 +709,34 @@ class SpiderFootWebUiApp:
                 'error_page.500': self._error_page_500,
                 'request.error_response': self._error_page
             })
-            
+
             self.log.info("All endpoints mounted successfully")
-            
+
         except Exception as e:
             self.log.error(f"Failed to mount endpoints: {e}")
             raise
-    
+
     def _error_page_401(self, status, message, traceback, version):
         """Enhanced 401 error page."""
         return ""
-    
+
     def _error_page_404(self, status, message, traceback, version):
         """Enhanced 404 error page with better user experience."""
         try:
-            from mako.template import Template
             templ = Template(
-                filename='spiderfoot/templates/error.tmpl', 
+                filename='spiderfoot/templates/error.tmpl',
                 lookup=self.lookup
             )
             return templ.render(
-                message='Page Not Found', 
-                docroot=self.docroot, 
-                status=status, 
+                message='Page Not Found',
+                docroot=self.docroot,
+                status=status,
                 version=self.config.get('__version__', 'unknown'),
                 suggestion="Please check the URL and try again."
             )
         except Exception:
             return f"<html><body><h1>404 - Page Not Found</h1><p>Status: {status}</p></body></html>"
-    
+
     def _error_page_500(self, status, message, traceback, version):
         """Enhanced 500 error page with debugging info."""
         try:
@@ -756,7 +747,7 @@ class SpiderFootWebUiApp:
                 return "<html><body><h1>Internal Server Error</h1><p>Please try again later.</p></body></html>"
         except Exception:
             return "<html><body><h1>500 - Internal Server Error</h1></body></html>"
-    
+
     def _error_page(self):
         """Enhanced generic error page."""
         cherrypy.response.status = 500
@@ -770,11 +761,11 @@ class SpiderFootWebUiApp:
                 cherrypy.response.body = b"<html><body>Debug Error</body></html>"
         else:
             cherrypy.response.body = b"<html><body>Error</body></html>"
-    
+
     def validate_system(self) -> Dict[str, Any]:
         """
         Perform comprehensive system validation.
-        
+
         Returns:
             Dictionary with validation results
         """
@@ -783,7 +774,7 @@ class SpiderFootWebUiApp:
             'checks': {},
             'timestamp': time.time()
         }
-        
+
         # Check database connectivity
         try:
             dbh = SpiderFootDb(self.config, init=False)
@@ -798,7 +789,7 @@ class SpiderFootWebUiApp:
                 'message': f'Database connection failed: {e}'
             }
             validation_results['success'] = False
-        
+
         # Check template availability
         try:
             template_count = len([f for f in os.listdir('spiderfoot/templates') if f.endswith('.tmpl')])
@@ -811,7 +802,7 @@ class SpiderFootWebUiApp:
                 'status': 'WARNING',
                 'message': f'Template check failed: {e}'
             }
-        
+
         # Check module configuration
         modules = self.config.get('__modules__', [])
         if modules:
@@ -824,7 +815,7 @@ class SpiderFootWebUiApp:
                 'status': 'WARNING',
                 'message': 'No modules configured'
             }
-        
+
         # Check security configuration
         if secure:
             validation_results['checks']['security'] = {
@@ -836,13 +827,13 @@ class SpiderFootWebUiApp:
                 'status': 'WARNING',
                 'message': 'Security headers not available'
             }
-        
+
         return validation_results
-    
+
     def get_system_info(self) -> Dict[str, Any]:
         """
         Get comprehensive system information.
-        
+
         Returns:
             Dictionary with system information
         """
@@ -858,7 +849,7 @@ class SpiderFootWebUiApp:
                 'security_headers': secure is not None,
                 'timestamp': time.time()
             }
-            
+
             # Add platform information
             import platform
             info['platform'] = {
@@ -867,7 +858,7 @@ class SpiderFootWebUiApp:
                 'machine': platform.machine(),
                 'processor': platform.processor()
             }
-            
+
             # Add memory information if available
             try:
                 import psutil
@@ -879,9 +870,9 @@ class SpiderFootWebUiApp:
                 }
             except ImportError:
                 info['memory'] = {'status': 'psutil not available'}
-            
+
             return info
-            
+
         except Exception as e:
             return {
                 'success': False,
@@ -892,12 +883,10 @@ class SpiderFootWebUiApp:
 
 if __name__ == "__main__":
     # Create a basic config for the web UI
-    import os
-    
     # Initialize with basic default config
     sf = SpiderFoot({})
     config = sf.defaultConfig() if hasattr(sf, 'defaultConfig') else {}
-    
+
     # If config is still empty, create a minimal valid config
     if not config:
         config = {
@@ -909,9 +898,9 @@ if __name__ == "__main__":
             '_internettlds': 'https://publicsuffix.org/list/effective_tld_names.dat',
             '_internettlds_cache': 72,
         }
-    
+
     web_config = {'root': '/'}
-    
+
     # Create the web application with proper config
     try:
         app = WebUiRoutes(web_config, config)

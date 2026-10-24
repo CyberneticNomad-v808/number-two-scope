@@ -191,3 +191,23 @@ pyvenv.cfg
 .sonar/
 *.p12
 sonarqube-blking-cert.pem
+
+# Extracted API keys
+extracted_keys.*
+
+# Live credential files — never commit real key/secret material
+spider.api.keys
+env.spiderfoot.apikeys
+.env.spider.api.keys.env
+.env.spiderfoot.apikeys.env
+recovered_env_files/
+SpiderFoot.cfg
+
+# Generated scan/test reports — regenerate locally, don't commit
+bandit-report.json
+safety-report.json
+test-results.xml
+.scannerwork/
+
+# Claude Code agent worktrees — scratch build dirs, never part of the repo
+.claude/worktrees/

@@ -128,6 +128,7 @@ class DbCore:
             status      VARCHAR NOT NULL \
         )",
         "CREATE TABLE IF NOT EXISTS tbl_scan_log ( \
+            id                  BIGSERIAL PRIMARY KEY, \
             scan_instance_id    VARCHAR NOT NULL REFERENCES tbl_scan_instance(guid), \
             generated           BIGINT NOT NULL, \
             component           VARCHAR, \

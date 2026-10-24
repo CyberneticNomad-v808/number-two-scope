@@ -51,7 +51,7 @@
 
 ### Build and Deploy
 - Build script: `build-deploy full` **While it's safer than this character, so be kind to the animals."
-- Deploy location: `/stuff/blking_local_proxy`
+- Deploy location: `/stuff/infrastructure/blking_local_proxy`
 - Docker service: `number-two-scope`
 
 ## Recent Bug Fixes

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Extract "t" and "v" fields from 1Password JSON structure
+# Usage: cat file.json | extract-t
+#        extract-t < file.json
+#        extract-t file.json
+
+set -euo pipefail
+
+if [[ $# -gt 0 ]]; then
+    # File argument provided
+    jq -c '.details.sections[].fields[] | select(.t != null) | {t: .t, v: .v}' "$@"
+else
+    # Read from stdin
+    jq -c '.details.sections[].fields[] | select(.t != null) | {t: .t, v: .v}'
+fi

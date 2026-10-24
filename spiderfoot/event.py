@@ -269,7 +269,7 @@ class SpiderFootEvent:
             ValueError: module value was invalid
         """
         if not isinstance(module, str):
-            raise TypeError(f"module is {type(module )}; expected str()")
+            raise TypeError(f"module is {type(module)}; expected str()")
 
         if not module and self.eventType != "ROOT":
             raise ValueError("module is empty")
@@ -321,7 +321,12 @@ class SpiderFootEvent:
                 f"sourceEvent is {type(sourceEvent)}; expected SpiderFootEvent()")
 
         self._sourceEvent = sourceEvent
-        self._sourceEventHash = self.sourceEvent.hash
+        # When the source is a ROOT event, propagate "ROOT" as the hash
+        # so DB queries on source_event_hash = 'ROOT' correctly identify top-level events.
+        if self.sourceEvent.eventType == "ROOT":
+            self._sourceEventHash = "ROOT"
+        else:
+            self._sourceEventHash = self.sourceEvent.hash
 
     @actualSource.setter
     def actualSource(self, actualSource: str) -> None:

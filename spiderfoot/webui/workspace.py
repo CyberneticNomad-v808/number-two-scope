@@ -190,12 +190,75 @@ class WorkspaceEndpoints:
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def workspacescancorrelations(self, workspace_id):
+        # Bugs fixed here: the response never included a 'success' key in
+        # either branch, so workspace_details.tmpl's loadCorrelations()
+        # (which checks `if (data.success)`) always took the error path --
+        # even when this call succeeded and found real correlations,
+        # reading the also-undefined data.error, producing exactly "Error
+        # loading correlations: undefined" regardless of actual data.
+        # Separately, the shape didn't match what the frontend reads at
+        # all: it expects correlation_groups (grouped by rule name, not a
+        # flat list), total_correlations/cross_scan_patterns/
+        # finished_scans/total_scans summary counts, and per-item fields
+        # named rule_risk/rule_description (get_cross_scan_correlations()
+        # returns risk/description).
         try:
             ws = SpiderFootWorkspace(self.config, workspace_id=workspace_id)
+            scan_details = ws.get_scan_details()
+            total_scans = len(scan_details)
+            finished_scans = sum(
+                1 for s in scan_details if s.get('status') == 'FINISHED'
+            )
+
             correlations = ws.get_cross_scan_correlations()
-            return {"correlations": correlations}
+
+            correlation_groups = {}
+            for corr in correlations:
+                rule_name = corr.get('rule_name') or corr.get('title') or 'Unknown'
+                correlation_groups.setdefault(rule_name, []).append({
+                    'scan_id': corr.get('scan_id'),
+                    'rule_risk': corr.get('risk'),
+                    'rule_description': corr.get('description'),
+                })
+
+            response = {
+                'success': True,
+                'correlations': correlations,
+                'correlation_groups': correlation_groups,
+                'total_correlations': len(correlations),
+                'cross_scan_patterns': len(correlation_groups),
+                'finished_scans': finished_scans,
+                'total_scans': total_scans,
+            }
+            if not correlations:
+                response['message'] = (
+                    "Need at least 2 completed scans for cross-correlation "
+                    "analysis." if finished_scans < 2 else
+                    "No correlations found across this workspace's "
+                    "finished scans."
+                )
+            return response
         except Exception as e:
-            return {"error": str(e)}
+            return {"success": False, "error": str(e)}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def workspaceruncorrelations(self, workspace_id):
+        # This endpoint didn't exist at all -- confirmed live, a 404 --
+        # which is why workspace_details.tmpl's "Run Correlation
+        # Analysis" button always failed with "Failed to start
+        # correlation analysis: Server error" (jQuery's .fail() callback,
+        # triggered by any non-2xx response). See
+        # SpiderFootWorkspace.run_cross_scan_correlations() for why this
+        # needed a real cross-scan implementation, not just a stub: the
+        # existing per-scan correlation (scan_service/scanner.py) never
+        # ran with more than one scan's own ID.
+        try:
+            ws = SpiderFootWorkspace(self.config, workspace_id=workspace_id)
+            correlated_count = ws.run_cross_scan_correlations()
+            return {"success": True, "correlations_created": correlated_count}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     @cherrypy.expose
     def workspacedetails(self, workspace_id):

@@ -1,0 +1,223 @@
+#
+# number-two-scope (SpiderFoot) — self-contained stack for live testing
+#
+# Bundles its own PostgreSQL and Redis so this stack has no dependency on
+# shared *data* infrastructure (unified-postgres, unified-redis). That's
+# deliberate for now: integrate with those only after this is
+# production-ready. See CLAUDE.md.
+#
+# It DOES join blking_private_network and route through the shared
+# internal-proxy (Traefik) — even dev work should go through the internal
+# proxy rather than raw host ports, so there's no ports: mapping here.
+# Reachable at https://number-two-scope.blk.ing (web UI) and
+# https://number-two-scope-api.blk.ing (API).
+#
+# Deploy: point Portainer at this file. It pulls the pre-built image from
+# GHCR (ghcr.io/cyberneticnomad-v808/number-two-scope) rather than building
+# in-place. Fill in real secrets via Portainer's own "Environment variables"
+# UI, using .env.example as the list of names to set — never commit real
+# values into this repo.
+#
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: number-two-scope-postgres
+    restart: unless-stopped
+    # SpiderFoot opens one DB connection per module thread, held for the
+    # whole scan (not just briefly) -- an "All modules" scan (270+ modules)
+    # needs 270+ connections simultaneously, and running several concurrent
+    # "All modules" scans (e.g. a multi-target workspace scan) multiplies
+    # that further. 300 was already exceeded live by 4 concurrent all-
+    # modules scans (~1080 connections needed); 5000 covers a much larger
+    # concurrent load. This is a command-line flag specifically because it
+    # overrides ALTER SYSTEM / postgresql.conf -- Postgres's precedence
+    # order puts -c above both, so changing this file is the only way to
+    # actually change max_connections for this container going forward.
+    command: ["-c", "max_connections=5000"]
+    security_opt:
+      - label:disable
+    environment:
+      - POSTGRES_DB=${SPIDERFOOT_DB:-spiderfoot}
+      - POSTGRES_USER=${SPIDERFOOT_DB_USER:-spiderfoot}
+      - POSTGRES_PASSWORD=${SPIDERFOOT_DB_PASSWORD}
+    volumes:
+      - number_two_scope_postgres_data:/var/lib/postgresql/data
+    networks:
+      - number_two_scope_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SPIDERFOOT_DB_USER:-spiderfoot} -d ${SPIDERFOOT_DB:-spiderfoot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: number-two-scope-redis
+    restart: unless-stopped
+    security_opt:
+      - label:disable
+    volumes:
+      - number_two_scope_redis_data:/data
+    networks:
+      - number_two_scope_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  number-two-scope:
+    image: ghcr.io/cyberneticnomad-v808/number-two-scope:latest
+    container_name: number-two-scope
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - label:disable
+    # sfp_tool_nmap's binary is setcap'd (cap_net_raw,cap_net_admin=eip) in
+    # the Dockerfile, but that's a ceiling only -- a container's own
+    # capability bounding set caps what any setcap'd binary inside it can
+    # actually gain. Without these, confirmed live: `nmap --version` fails
+    # outright with "Operation not permitted" (exit 126), before nmap even
+    # gets to scanning anything.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    # Module API keys (SF__<MODULE>__<OPTION>=...) are set through Portainer's
+    # own "Environment variables" UI, not a committed file — see .env.example
+    # for the naming convention. Add each key you need under `environment:`
+    # here, or as ${VAR}-style references, once you configure it in Portainer.
+    environment:
+      - SPIDERFOOT_DB_TYPE=postgresql
+      - SPIDERFOOT_DB_HOST=postgres
+      - SPIDERFOOT_DB_PORT=5432
+      # Both names are required: SPIDERFOOT_DB_NAME is read by sfp__stor_db.py
+      # and db_core.py; SPIDERFOOT_DB (legacy name) is read directly by
+      # spiderfoot/webui/routes.py, which defaults to 'spiderfoot_db' if unset
+      # -- a mismatch against this Postgres's actual database name otherwise.
+      - SPIDERFOOT_DB_NAME=${SPIDERFOOT_DB:-spiderfoot}
+      - SPIDERFOOT_DB=${SPIDERFOOT_DB:-spiderfoot}
+      - SPIDERFOOT_DB_USER=${SPIDERFOOT_DB_USER:-spiderfoot}
+      - SPIDERFOOT_DB_PASSWORD=${SPIDERFOOT_DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # nmap's own privileged-scan check only trusts geteuid()==0 on this
+      # build (Debian bullseye's nmap 7.80) -- it doesn't auto-detect the
+      # cap_net_raw/cap_net_admin file capabilities granted below via
+      # cap_add + the Dockerfile's setcap, even though those capabilities
+      # are genuinely usable (confirmed live: `nmap -sS --privileged`
+      # succeeds; plain `nmap -sS` without this refuses with "requires
+      # root privileges"). This is nmap's own documented override for
+      # exactly this scenario -- no module code change needed.
+      - NMAP_PRIVILEGED=1
+      # Tool binary paths for the sfp_tool_* modules. These were set by
+      # hand via direct SQL against the live database when discovered
+      # empty (every one of these modules was silently non-functional
+      # despite its binary being installed) -- that fix didn't survive a
+      # fresh deploy with a new database. Made repeatable via
+      # apply_env_config_overrides() in sf_orchestrator.py, which seeds
+      # tbl_config from SF__<SCOPE>__<OPT> env vars at every startup.
+      # Not secrets -- these are fixed paths inside this image, so plain
+      # literal values here (not ${VAR} references) are correct, same as
+      # SPIDERFOOT_DB_HOST=postgres above.
+      - SF__SFP_TOOL_NMAP__NMAPPATH=/usr/bin/nmap
+      - SF__SFP_TOOL_NBTSCAN__NBTSCAN_PATH=/usr/bin/nbtscan
+      - SF__SFP_TOOL_ONESIXTYONE__ONESIXTYONE_PATH=/usr/bin/onesixtyone
+      - SF__SFP_TOOL_WHATWEB__WHATWEB_PATH=/usr/bin/whatweb
+      - SF__SFP_TOOL_WAFW00F__WAFW00F_PATH=/opt/venv/bin/wafw00f
+      - SF__SFP_TOOL_TRUFFLEHOG__TRUFFLEHOG_PATH=/opt/venv/bin/trufflehog
+      - SF__SFP_TOOL_SNALLYGASTER__SNALLYGASTER_PATH=/opt/venv/bin/snallygaster
+      - SF__SFP_TOOL_NUCLEI__NUCLEI_PATH=/tools/bin/nuclei
+      - SF__SFP_TOOL_NUCLEI__TEMPLATE_PATH=/tools/nuclei-templates
+      - SF__SFP_TOOL_RETIREJS__RETIREJS_PATH=/tools/bin/retire
+      - SF__SFP_TOOL_TESTSSLSH__TESTSSLSH_PATH=/tools/testssl.sh/testssl.sh
+      - SF__SFP_TOOL_CMSEEK__CMSEEKPATH=/tools/CMSeeK/cmseek.py
+      - SF__SFP_TOOL_DNSTWIST__DNSTWISTPATH=/opt/venv/bin/dnstwist
+      - SF__SFP_TOOL_GOBUSTER__GOBUSTER_PATH=/tools/bin/gobuster
+      # These had drifted: they were only ever in the ad-hoc StackUpdate
+      # payload used to redeploy this stack, never actually committed
+      # here despite this file's own header saying it's the source of
+      # truth for deploys. Brought back in sync with what's actually
+      # live -- see this project's own CLAUDE.md hard rule about env var
+      # names and stack references needing to move together.
+      - SF__SFP_ABUSEIPDB__API_KEY=${SF__SFP_ABUSEIPDB__API_KEY}
+      - SF__SFP_ALIENVAULT__API_KEY=${SF__SFP_ALIENVAULT__API_KEY}
+      - SF__SFP_ARBITRUM__API_KEY=${SF__SFP_ARBITRUM__API_KEY}
+      - SF__SFP_BNB__API_KEY=${SF__SFP_BNB__API_KEY}
+      - SF__SFP_BOTSWOT__API_KEY=${SF__SFP_BOTSWOT__API_KEY}
+      - SF__SFP_CENSYS__CENSYS_API_KEY_SECRET=${SF__SFP_CENSYS__CENSYS_API_KEY_SECRET}
+      - SF__SFP_ETHEREUM__API_KEY=${SF__SFP_ETHEREUM__API_KEY}
+      - SF__SFP_ETHERSCAN__API_KEY=${SF__SFP_ETHERSCAN__API_KEY}
+      - SF__SFP_FULLHUNT__API_KEY=${SF__SFP_FULLHUNT__API_KEY}
+      - SF__SFP_GREYNOISE_COMMUNITY__API_KEY=${SF__SFP_GREYNOISE_COMMUNITY__API_KEY}
+      - SF__SFP_GREYNOISE__API_KEY=${SF__SFP_GREYNOISE__API_KEY}
+      - SF__SFP_HUNTER__API_KEY=${SF__SFP_HUNTER__API_KEY}
+      - SF__SFP_HYBRID_ANALYSIS__API_KEY=${SF__SFP_HYBRID_ANALYSIS__API_KEY}
+      - SF__SFP_IPINFO__API_KEY=${SF__SFP_IPINFO__API_KEY}
+      - SF__SFP_LEAKIX__API_KEY=${SF__SFP_LEAKIX__API_KEY}
+      - SF__SFP_PROJECTDISCOVERY__API_KEY=${SF__SFP_PROJECTDISCOVERY__API_KEY}
+      - SF__SFP_PULSEDIVE__API_KEY=${SF__SFP_PULSEDIVE__API_KEY}
+      - SF__SFP_SECURITYTRAILS__API_KEY=${SF__SFP_SECURITYTRAILS__API_KEY}
+      - SF__SFP_SHODAN__API_KEY=${SF__SFP_SHODAN__API_KEY}
+      - SF__SFP_SOLSCAN__API_KEY=${SF__SFP_SOLSCAN__API_KEY}
+      - SF__SFP_URLSCAN__API_KEY=${SF__SFP_URLSCAN__API_KEY}
+      - SF__SFP_VIRUSTOTAL__API_KEY=${SF__SFP_VIRUSTOTAL__API_KEY}
+    volumes:
+      - number_two_scope_logs:/home/spiderfoot/logs
+      - number_two_scope_dotlogs:/home/spiderfoot/.spiderfoot/logs
+      - number_two_scope_cache:/home/spiderfoot/cache
+      - number_two_scope_config:/home/spiderfoot/config
+      - number_two_scope_data:/home/spiderfoot/data
+    networks:
+      - number_two_scope_internal
+      - blking_private_network
+      - tor_proxy_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.number-two-scope.rule=Host(`number-two-scope.blk.ing`)"
+      - "traefik.http.routers.number-two-scope.entrypoints=websecure"
+      - "traefik.http.routers.number-two-scope.tls=true"
+      - "traefik.http.routers.number-two-scope.service=number-two-scope"
+      - "traefik.http.services.number-two-scope.loadbalancer.server.port=5001"
+      - "traefik.http.routers.number-two-scope-api.rule=Host(`number-two-scope-api.blk.ing`)"
+      - "traefik.http.routers.number-two-scope-api.entrypoints=websecure"
+      - "traefik.http.routers.number-two-scope-api.tls=true"
+      - "traefik.http.routers.number-two-scope-api.service=number-two-scope-api"
+      - "traefik.http.services.number-two-scope-api.loadbalancer.server.port=8001"
+
+networks:
+  number_two_scope_internal:
+    driver: bridge
+  blking_private_network:
+    external: true
+  # Joins the "onion" Tor SOCKS/DNS proxy container so onion-search
+  # modules (sfp_torch, sfp_ahmia, sfp_onioncity, sfp_onionsearchengine)
+  # can actually reach it -- confirmed live: onion exposes SOCKSPort 9150
+  # and DNSPort 8853 on this network, hostname "onion".
+  #
+  # This alone does NOT route any scan traffic through Tor -- SpiderFoot's
+  # SOCKS proxy setting (_socks1type/_socks2addr/_socks3port, set via
+  # Settings, not this file) is scan-wide, not per-module: enabling it
+  # routes *every* module's traffic through Tor for that scan, not just
+  # the onion-specific ones (confirmed in scan_service/scanner.py --
+  # it sets one shared proxy on the SpiderFoot helper object every
+  # module's fetchUrl() call uses). So joining this network just makes
+  # onion reachable when you deliberately turn Tor proxying on for a
+  # scan; it's not on by default, and there's no way in this codebase to
+  # scope Tor to just the onion modules.
+  tor_proxy_network:
+    external: true
+
+volumes:
+  number_two_scope_postgres_data:
+  number_two_scope_redis_data:
+  number_two_scope_logs:
+  number_two_scope_dotlogs:
+  number_two_scope_cache:
+  number_two_scope_config:
+  number_two_scope_data:

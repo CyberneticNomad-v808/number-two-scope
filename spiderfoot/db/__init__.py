@@ -276,6 +276,8 @@ class SpiderFootDb:
         ['BLOCKCHAIN_TRANSACTION_FLOW', 'Blockchain Transaction Flow', 0, 'DESCRIPTOR'],
         ['BLUESKY_POST', 'Bluesky Post', 1, 'DATA'],
         ['CACHE_STATS', 'Cache Statistics', 1, 'DATA'],
+        ['CORRELATION_ANALYSIS', 'Correlation Analysis', 0, 'DESCRIPTOR'],
+        ['RESOURCE_USAGE', 'Resource Usage', 1, 'DATA'],
         ['CARRIER_NAME', 'Carrier Name', 0, 'DESCRIPTOR'],
         ['CARRIER_TYPE', 'Carrier Type', 0, 'DESCRIPTOR'],
         ['CLOUD_INSTANCE_TYPE', 'Cloud Instance Type', 0, 'DESCRIPTOR'],
@@ -526,6 +528,8 @@ class SpiderFootDb:
         return self._scan.scanInstanceDelete(*args, **kwargs)
     def scanInstanceList(self):
         return self._scan.scanInstanceList()
+    def reconcileStaleScans(self) -> int:
+        return self._scan.reconcileStaleScans()
     def scanInstanceSet(self, instanceId: str, started: str = None, ended: str = None, status: str = None):
         """
         Direct pass-through to the underlying _scan.scanInstanceSet method.

@@ -38,7 +38,7 @@ Verification: [How to verify]
 ## User Requirements
 
 ### UR-001: OSINT Data Collection
-**Description:** As an analyst, I need to automatically collect intelligence from multiple sources about a target.
+i df**Description:** As an analyst, I need to automatically collect intelligence from multiple sources about a target.
 
 **Acceptance Criteria:**
 - System SHALL collect data from 270+ OSINT sources

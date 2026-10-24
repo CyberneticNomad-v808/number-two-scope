@@ -86,6 +86,58 @@ class ScanManager:
                         continue
                     raise IOError("Unable to set information for the scan instance.") from e
 
+    def reconcileStaleScans(self) -> int:
+        """Mark any scan left in an active status as ABORTED.
+
+        Meant to be called once, right as the server process starts.
+        A scan's active statuses (STARTING/RUNNING/etc.) only mean
+        something while the scanner process that owns it is alive --
+        if the app container gets restarted (a redeploy, a crash) while
+        a scan is mid-flight, that process just dies with it, and
+        nothing else ever runs to update its status. It sits showing
+        RUNNING forever, indistinguishable from a genuinely active scan,
+        even though nothing is actually working on it. Confirmed live:
+        a scan sat RUNNING for 79 minutes with no new results in the
+        last 68 of them, because the container had been redeployed
+        several times since it started.
+
+        A freshly-started process can't possibly own any scan that
+        predates it (module threads and their scan_service.scanner
+        objects are entirely in-process state, never persisted or
+        recovered across a restart), so any scan in one of these
+        statuses when this runs is unconditionally stale.
+
+        Returns:
+            int: number of scans reconciled
+        """
+        active_statuses = [
+            'CREATED', 'INITIALIZING', 'STARTING', 'STARTED', 'RUNNING',
+            'ABORT-REQUESTED', 'ABORTING',
+        ]
+        ph = get_placeholder(self.db_type)
+        placeholders = ', '.join([ph] * len(active_statuses))
+        qry = (
+            f"UPDATE tbl_scan_instance SET status = {ph}, ended = {ph} "
+            f"WHERE status IN ({placeholders})"
+        )
+        qvars = [
+            'ABORTED', int(time.time() * 1000), *active_statuses
+        ]
+        with self.dbhLock:
+            for attempt in range(3):
+                try:
+                    self.dbh.execute(qry, qvars)
+                    count = self.dbh.rowcount
+                    self.conn.commit()
+                    return count
+                except (psycopg2.Error) as e:
+                    self._log_db_error("Unable to reconcile stale scans.", e)
+                    if self._is_transient_error(e) and attempt < 2:
+                        time.sleep(0.2 * (attempt + 1))
+                        continue
+                    raise IOError("Unable to reconcile stale scans.") from e
+        return 0
+
     def scanInstanceGet(self, instanceId: str) -> list:
         if not isinstance(instanceId, str):
             raise TypeError(f"instanceId is {type(instanceId)}; expected str()")

@@ -48,7 +48,15 @@ class sfp_subdomain_takeover(SpiderFootPlugin):
         for opt in userOpts.keys():
             self.opts[opt] = userOpts[opt]
 
-        content = self.sf.cacheGet("subjack-fingerprints", 48)
+        # Cache key changed from "subjack-fingerprints" to
+        # "can-i-take-over-xyz-fingerprints" deliberately: the old key had
+        # a poisoned 404 response cached under it from before this source
+        # swap (the pre-fix code cached fetchUrl()'s result unconditionally,
+        # with no HTTP-status check), and cacheGet() runs before any of the
+        # fetch/validation logic below -- reusing the old key would keep
+        # serving that stale garbage for its full 48h TTL regardless of any
+        # fix here, exactly what happened live the first time this shipped.
+        content = self.sf.cacheGet("can-i-take-over-xyz-fingerprints", 48)
         if content is None:
             # The original haccer/subjack fingerprints.json this module was
             # written against no longer exists upstream (subjack dropped the
@@ -64,7 +72,7 @@ class sfp_subdomain_takeover(SpiderFootPlugin):
                 self.errorState = True
                 return
 
-            self.sf.cachePut("subjack-fingerprints", res['content'])
+            self.sf.cachePut("can-i-take-over-xyz-fingerprints", res['content'])
             content = res['content']
 
         try:

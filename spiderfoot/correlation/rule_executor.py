@@ -72,13 +72,24 @@ class DefaultRuleExecutionStrategy(RuleExecutionStrategy):
 
         # Handle both dict and list formats for collections
         if isinstance(collections, list):
-            # Test format: collections is a list of dicts with 'collect' key
+            # Real rule YAML format: a list of collection dicts, each with
+            # its 'collect' filters nested under 'condition' (see any file
+            # in correlations/, e.g. cert_expired.yaml). A bare
+            # collection['collect'] never matches this shape -- it was
+            # silently returning zero collect_rules for all 53 shipped
+            # rules, so every correlation rule matched nothing on every
+            # scan. Test fixtures use the flatter collection['collect']
+            # shape directly, so fall back to that when 'condition' is
+            # absent.
             collect_rules = []
             for collection in collections:
-                if 'collect' in collection:
+                condition = collection.get('condition')
+                if isinstance(condition, dict) and 'collect' in condition:
+                    collect_rules.extend(condition['collect'])
+                elif 'collect' in collection:
                     collect_rules.extend(collection['collect'])
         else:
-            # YAML format: collections is a dict with 'collect' key
+            # Dict format: collections is a dict with 'collect' key
             collect_rules = collections.get('collect', [])
 
         if not collect_rules:

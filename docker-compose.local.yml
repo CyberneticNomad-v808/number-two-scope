@@ -1,0 +1,23 @@
+#
+# Local-box override for fast iteration -- no Traefik, no shared
+# blking_private_network (doesn't exist off the production host), image
+# built and used locally instead of pulled from GHCR. Use with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+services:
+  number-two-scope:
+    image: ghcr.io/cyberneticnomad-v808/number-two-scope:latest
+    pull_policy: never
+    networks:
+      - number_two_scope_internal
+    ports:
+      - "127.0.0.1:5001:5001"
+      - "127.0.0.1:8001:8001"
+    labels: []
+
+networks:
+  blking_private_network:
+    external: false
+  tor_proxy_network:
+    external: false

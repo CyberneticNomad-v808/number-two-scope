@@ -485,18 +485,80 @@ class SpiderFootScanner():
 
         finally:
             if not failed:
+                self.runModuleFinishHooks()
                 self.__setStatus("FINISHED", None, time.time() * 1000)
                 self.runCorrelations()
                 self.__sf.status(f"Scan [{self.__scanId}] completed.")
             self.__dbh.close()
+
+    def runModuleFinishHooks(self) -> None:
+        """Call scanFinished() on every module that defines one, then
+        persist any events those hooks produce.
+
+        scanFinished() is a documented lifecycle hook (sfp_advanced_
+        correlation's temporal/geospatial/entity-resolution/behavioral
+        analysis, sfp_ai_summary's on-finish summary, sfp_performance_
+        optimizer's cleanup) that nothing in this file ever called --
+        confirmed by grepping the whole codebase for callers and finding
+        none. It ran for no scan, ever.
+
+        By the time this runs, waitForThreads() has already returned and
+        shut down __sharedThreadPool, so every module's own thread has
+        exited. scanFinished() therefore runs synchronously here on the
+        main thread, which is safe (it's plain Python method calls). But
+        each module's outgoingEventQueue still points at self.eventQueue,
+        and normally the loop inside waitForThreads() is what drains that
+        queue and re-dispatches events to other modules' incomingEventQueue
+        -- with no thread left to run that loop, anything a scanFinished()
+        hook enqueues via notifyListeners() would otherwise sit in
+        eventQueue forever and never reach the database. So this drains
+        eventQueue itself afterward and stores each event directly via
+        scanEventStore(), the same call sfp__stor_db's (now-dead) handleEvent
+        would have made. It does not re-dispatch those events to other
+        modules' handleEvent() -- doing that would need those modules'
+        threads running again, a much bigger change than what was asked for
+        here.
+        """
+        for modName, mod in self.__moduleInstances.items():
+            if mod.errorState:
+                continue
+            finishHook = getattr(mod, 'scanFinished', None)
+            if not callable(finishHook):
+                continue
+            # waitForThreads()'s finally block just set _stopScanning = True
+            # on every module. notifyListeners() -> checkForStop() treats
+            # that as "give up", so any event a finish hook emits gets
+            # silently dropped before it ever reaches eventQueue -- no
+            # exception, no log, it just vanishes. The module's own thread
+            # is already gone by this point, so it's safe to clear this
+            # just for the duration of the synchronous call below.
+            mod._stopScanning = False
+            try:
+                finishHook()
+            except Exception as e:
+                self.__sf.error(f"Module {modName} scanFinished() failed: {e}")
+
+        if not self.eventQueue:
+            return
+
+        while True:
+            try:
+                sfEvent = self.eventQueue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                self.__dbh.scanEventStore(self.__scanId, sfEvent)
+            except Exception as e:
+                self.__sf.error(
+                    f"Failed to store event from a module's scanFinished() "
+                    f"hook: {e}"
+                )
 
     def runCorrelations(self) -> None:
         """Run correlation rules on completed scan."""
         try:
             from spiderfoot.correlation.rule_executor import RuleExecutor
             from spiderfoot.correlation.event_enricher import EventEnricher
-            from spiderfoot.correlation.result_aggregator import ResultAggregator
-
             # Check if correlation rules exist
             if '__correlationrules__' not in self.__config:
                 self.__sf.error("No correlation rules found in configuration")
@@ -517,11 +579,27 @@ class SpiderFootScanner():
                 if 'events' in result:
                     result['events'] = enricher.enrich_sources(self.__scanId, result['events'])
                     result['events'] = enricher.enrich_entities(self.__scanId, result['events'])
-            aggregator = ResultAggregator()
-            agg_count = aggregator.aggregate(list(results.values()), method='count')
-            self.__sf.status(f"Correlated {agg_count} results for scan {self.__scanId}")
+            # ResultAggregator.aggregate(method='count') just does len() on
+            # whatever's passed in -- passing all per-rule results would
+            # count rules run (53), not correlations actually created. Sum
+            # the real per-rule counts instead so this status line matches
+            # what actually landed in tbl_scan_correlation_results.
+            correlated_count = sum(
+                r.get('correlations_created', 0) for r in results.values()
+            )
+            self.__sf.status(f"Correlated {correlated_count} results for scan {self.__scanId}")
         except Exception as e:
-            self.__sf.error(f"Failed to run correlations for scan {self.__scanId}: {e}", exc_info=True)
+            # SpiderFoot.error() takes only a message -- exc_info isn't a
+            # supported kwarg. Passing it raised TypeError from inside this
+            # except block, which masked whatever the real correlation
+            # failure was (e.g. the get_sources()/get_entities() '?'
+            # placeholder bug, real errors are logged now that this crashes
+            # itself) and propagated uncaught out of __startScan(), skipping
+            # the "Scan ... completed." status update.
+            self.__sf.error(
+                f"Failed to run correlations for scan {self.__scanId}: "
+                f"{e}\n{traceback.format_exc()}"
+            )
 
     def waitForThreads(self) -> None:
         if not self.eventQueue:

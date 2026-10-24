@@ -803,6 +803,46 @@ class SpiderFootWorkspace:
             self.log.error(f"Failed to get cross-scan correlations: {e}")
             return []
 
+    def run_cross_scan_correlations(self) -> int:
+        """Run correlation rules across every scan in this workspace.
+
+        The webui's "Run Correlation Analysis" button (workspaceruncorrelations
+        in webui/workspace.py) posted to an endpoint that never existed --
+        confirmed live, a 404. Nothing in this codebase ever actually ran
+        cross-scan correlation; scan_service/scanner.py's runCorrelations()
+        already supports it (RuleExecutor takes a list of scan_ids), it
+        was just only ever called with a single scan's own ID at the end
+        of that one scan, never with a workspace's full scan list.
+
+        RuleExecutor.run() writes matches directly to
+        tbl_scan_correlation_results itself -- that's the only thing that
+        actually needs to happen for get_cross_scan_correlations() (the
+        existing read side) to pick them up. The event-enrichment step
+        scanner.py's single-scan version does afterward only decorates an
+        in-memory dict that gets discarded either way (runCorrelations()
+        returns None) -- not worth reproducing here, and it would need a
+        different scan_id per event's own originating scan rather than one
+        scan_id applied to everything, which enrich_sources()/
+        enrich_entities() don't support.
+
+        Returns:
+            Count of correlation results actually written.
+        """
+        scan_ids = self.get_scan_ids()
+        if not scan_ids:
+            return 0
+
+        rules = self.config.get('__correlationrules__')
+        if not rules:
+            self.log.info("No correlation rules configured, skipping correlation")
+            return 0
+
+        from spiderfoot.correlation.rule_executor import RuleExecutor
+
+        executor = RuleExecutor(self.db, rules, scan_ids=scan_ids)
+        results = executor.run()
+        return sum(r.get('correlations_created', 0) for r in results.values())
+
     def remove_target(self, target_id: str) -> bool:
         """Remove target from workspace.
 

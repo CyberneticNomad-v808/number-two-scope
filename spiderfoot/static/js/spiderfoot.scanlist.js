@@ -2,6 +2,8 @@ let globalTypes = null;
 let globalFilter = null;
 let lastChecked = null;
 let currentRequest = null;
+let scanlistRefreshInterval = null;
+const SCANLIST_ACTIVE_STATUSES = ["CREATED", "RUNNING", "STARTED", "STARTING", "INITIALIZING"];
 
 function switchSelectAll() {
     if (!$("#checkall")[0].checked) {
@@ -336,7 +338,11 @@ function showlisttable(types, filter, data) {
         buttons += "</div>";        var table = "<table id='scanlist' class='table table-bordered table-striped'>";
         table += "<thead><tr><th class='sorter-false text-center'><input id='checkall' type='checkbox'></th> <th>Scan ID</th> <th>Name</th> <th>Target</th> <th>Started</th> <th >Finished</th> <th class='text-center'>Status</th> <th class='text-center'>Elements</th><th class='text-center'>Correlations</th><th class='sorter-false text-center'>Action</th> </tr></thead><tbody>";
         let filtered = 0;
+        let hasActiveScan = false;
         for (var i = 0; i < data.length; i++) {
+            if ($.inArray(data[i][6], SCANLIST_ACTIVE_STATUSES) !== -1) {
+                hasActiveScan = true;
+            }
             if (types != null && $.inArray(data[i][6], types) === -1) {
                 filtered++;
                 continue;
@@ -403,6 +409,22 @@ function showlisttable(types, filter, data) {
         $("#scancontent-wrapper").remove();
         $("#scancontent").append("<div id='scancontent-wrapper'> " + buttons + table + "</div>");
         sf.updateTooltips();
+
+        // This page previously only fetched /scanlist once, on load --
+        // a scan shown as STARTING/RUNNING stayed stuck at that status
+        // forever unless the user manually clicked Refresh or reloaded
+        // the page, even long after the scan had actually finished.
+        // scaninfo.tmpl already polls its own single-scan status every
+        // 5s for the same reason; do the same here, but only while a scan
+        // in the current list is actually active, so a page full of
+        // finished scans doesn't poll forever.
+        if (scanlistRefreshInterval) {
+            clearInterval(scanlistRefreshInterval);
+            scanlistRefreshInterval = null;
+        }
+        if (hasActiveScan) {
+            scanlistRefreshInterval = setInterval(reload, 5000);
+        }
         
         // Add error handling around tablesorter initialization
         try {

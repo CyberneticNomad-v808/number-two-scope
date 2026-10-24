@@ -38,6 +38,39 @@ from spiderfoot import __version__, SpiderFootDb
 from spiderfoot.logger import logListenerSetup, logWorkerSetup
 
 
+def apply_env_config_overrides(dbh) -> int:
+    """Seed tbl_config from SF__<SCOPE>__<OPT> environment variables.
+
+    Matches the naming convention already documented in docker-compose.yml
+    (e.g. SF__SFP_ABUSEIPDB__API_KEY) -- scope and opt are the real
+    tbl_config values, uppercased and joined with "__", prefixed with
+    "SF__". The split point is the LAST "__" in the variable name (not
+    the first), so this also works for module names that themselves
+    contain a double underscore (e.g. SF__SFP__STOR_DB__MAXSTORAGE ->
+    scope "sfp__stor_db", opt "maxstorage").
+
+    Only non-empty values are applied, and only variables that actually
+    have both a scope and an opt component -- everything else (unrelated
+    env vars, or SF__ vars with no second "__") is ignored. Returns the
+    count of values applied.
+    """
+    overrides = {}
+    for key, val in os.environ.items():
+        if not key.startswith("SF__") or not val:
+            continue
+        remainder = key[len("SF__"):]
+        if "__" not in remainder:
+            continue
+        scope, opt = remainder.rsplit("__", 1)
+        if not scope or not opt:
+            continue
+        overrides[f"{scope.lower()}:{opt.lower()}"] = val
+
+    if overrides:
+        dbh.configSet(overrides)
+    return len(overrides)
+
+
 class SpiderFootOrchestrator:
     """
     Main orchestrator class that coordinates all SpiderFoot components.
@@ -375,10 +408,50 @@ class SpiderFootOrchestrator:
     def handle_server_startup(self, args) -> None:
         """
         Handle server startup based on arguments.
-        
+
         Args:
             args: Parsed command line arguments
         """
+        # A fresh process can't possibly own any scan left in an active
+        # status from before it started (module threads and scanner
+        # state are entirely in-process, never recovered across a
+        # restart) -- reconcile those to ABORTED now, once, before
+        # serving anything. See reconcileStaleScans() for the incident
+        # this fixes: a scan sat RUNNING for over an hour with no new
+        # results, because the container had been redeployed since it
+        # started.
+        try:
+            dbh = SpiderFootDb(self.config, init=True)
+            reconciled = dbh.reconcileStaleScans()
+            if reconciled:
+                self.log.info(
+                    f"Reconciled {reconciled} stale scan(s) left RUNNING "
+                    f"by a prior process to ABORTED."
+                )
+        except Exception as e:
+            self.log.error(f"Failed to reconcile stale scans at startup: {e}")
+
+        # docker-compose.yml documents an SF__<SCOPE>__<OPT> environment
+        # variable convention for module config (API keys, tool binary
+        # paths) -- but nothing in this codebase ever actually read those
+        # variables. Confirmed live: SF__SFP_ABUSEIPDB__API_KEY had held a
+        # real value in every deploy this session, yet
+        # tbl_config.sfp_abuseipdb.api_key was empty in the running
+        # database. Every module depending on an env-var-configured
+        # API key or tool path has been silently non-functional. Apply
+        # them here, once, at startup, so a fresh deploy (new empty
+        # database) actually ends up configured instead of requiring
+        # someone to hand-run SQL or click through Settings first.
+        try:
+            applied = apply_env_config_overrides(dbh)
+            if applied:
+                self.log.info(
+                    f"Applied {applied} module config value(s) from "
+                    f"SF__<SCOPE>__<OPT> environment variables."
+                )
+        except Exception as e:
+            self.log.error(f"Failed to apply env-based config overrides at startup: {e}")
+
         # Prepare server configurations
         web_config = self.config_manager.get_web_config()
         api_config = self.config_manager.get_api_config()

@@ -74,6 +74,13 @@ class InfoEndpoints:
             for mod in modules_data:
                 modlist.append(mod)
 
+        # sfp__* (double-underscore) modules are internal plumbing, not
+        # user-selectable scan modules -- e.g. sfp__stor_db is force-added
+        # to every scan's module list regardless of what the user picked
+        # (see workspace.py, webui/scan.py, webui/routes.py), so it was
+        # never meant to appear as something a user chooses independently.
+        modlist = [m for m in modlist if not m['name'].startswith('sfp__')]
+
         return sorted(modlist, key=lambda x: x['name'])
 
     @cherrypy.expose

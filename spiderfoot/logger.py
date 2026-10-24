@@ -202,27 +202,41 @@ def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.Queue
     # Log to terminal
     console_handler = logging.StreamHandler(sys.stderr)
 
-    # Log debug messages to file
+    # Log debug/error messages to file. A container recreated with a log
+    # directory it can't write to (seen live: rootless-Podman UID/namespace
+    # drift across container recreations) must not crash the whole
+    # orchestrator over file logging -- fall back to console-only in that
+    # case, same as the security_logging.py handlers already do.
     log_dir = SpiderFootHelpers.logPath()
-    debug_handler = logging.handlers.TimedRotatingFileHandler(
-        f"{log_dir}/spiderfoot.debug.log",
-        when="d",
-        interval=1,
-        backupCount=30
-    )
-
-    # Log error messages to file
-    error_handler = logging.handlers.TimedRotatingFileHandler(
-        f"{log_dir}/spiderfoot.error.log",
-        when="d",
-        interval=1,
-        backupCount=30
-    )
+    debug_handler = None
+    error_handler = None
+    try:
+        debug_handler = logging.handlers.TimedRotatingFileHandler(
+            f"{log_dir}/spiderfoot.debug.log",
+            when="d",
+            interval=1,
+            backupCount=30
+        )
+        error_handler = logging.handlers.TimedRotatingFileHandler(
+            f"{log_dir}/spiderfoot.error.log",
+            when="d",
+            interval=1,
+            backupCount=30
+        )
+    except OSError as e:
+        sys.stderr.write(
+            f"logger: could not open debug/error log files under "
+            f"{log_dir} ({e}); continuing with console-only logging.\n"
+        )
+        debug_handler = None
+        error_handler = None
 
     # Filter by log level
     console_handler.addFilter(lambda x: x.levelno >= logLevel)
-    debug_handler.addFilter(lambda x: x.levelno >= logging.DEBUG)
-    error_handler.addFilter(lambda x: x.levelno >= logging.WARN)
+    if debug_handler:
+        debug_handler.addFilter(lambda x: x.levelno >= logging.DEBUG)
+    if error_handler:
+        error_handler.addFilter(lambda x: x.levelno >= logging.WARN)
 
     # Set log format
     log_format = logging.Formatter(
@@ -230,11 +244,13 @@ def logListenerSetup(loggingQueue, opts: dict = None) -> 'logging.handlers.Queue
     debug_format = logging.Formatter(
         "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)s : %(message)s")
     console_handler.setFormatter(log_format)
-    debug_handler.setFormatter(debug_format)
-    error_handler.setFormatter(debug_format)
+    if debug_handler:
+        debug_handler.setFormatter(debug_format)
+    if error_handler:
+        error_handler.setFormatter(debug_format)
 
     if doLogging:
-        handlers = [console_handler, debug_handler, error_handler]
+        handlers = [console_handler] + [h for h in (debug_handler, error_handler) if h]
     else:
         handlers = []
 

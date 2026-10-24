@@ -357,7 +357,21 @@ class ScanEndpoints:
         retdata = []
         dbh = SpiderFootDb(self.config)
         try:
-            data = dbh.scanResultEvent(id, eventType, filterfp, correlationId)
+            # Was calling scanResultEvent(id, eventType, filterfp,
+            # correlationId) positionally, but its actual signature is
+            # (instanceId, eventType, srcModule, data, sourceId,
+            # correlationId, filterFp) -- filterfp landed on srcModule
+            # (a truthy filterfp would filter by module='True'/'1',
+            # matching no real module) and correlationId landed on data
+            # (filtering by data value, not correlation), instead of
+            # either actually reaching the parameters they're named for.
+            # Using keyword args here so this can't silently drift again.
+            data = dbh.scanResultEvent(
+                id,
+                eventType=eventType or 'ALL',
+                filterFp=filterfp,
+                correlationId=correlationId,
+            )
             for row in data:
                 retdata.append(row)
         except Exception:

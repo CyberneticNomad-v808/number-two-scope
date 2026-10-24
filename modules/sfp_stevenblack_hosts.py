@@ -126,11 +126,19 @@ class sfp_stevenblack_hosts(SpiderFootPlugin):
             return hosts
 
         for line in blocklist.split('\n'):
+            line = line.strip()
             if not line:
                 continue
             if line.startswith('#'):
                 continue
-            host = line.strip().split(" ")[1]
+            # Lines are normally "0.0.0.0 host.name", but a stray line with
+            # no whitespace-separated host (or trailing comment-only line)
+            # crashed this with an IndexError instead of just being
+            # skipped -- seen live as an uncaught thread-worker exception.
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            host = parts[1]
             # Note: Validation with sf.validHost() is too slow to use here
             # if not self.sf.validHost(host, self.opts['_internettlds']):
             #    continue

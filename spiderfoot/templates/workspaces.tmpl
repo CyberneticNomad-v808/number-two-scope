@@ -181,29 +181,21 @@
                 <!-- Module filtering options -->
                 <div class="row" style="margin-bottom: 10px;">
                   <div class="col-md-6">
+                    <!-- Options are populated dynamically in
+                         populateCategoryFilterOptions() from the live
+                         /modules payload's real 'cats' values, not
+                         hardcoded -- see workspace_details.tmpl for why. -->
                     <select class="form-control form-control-sm" id="moduleTypeFilter">
-                      <option value="">Filter by Category</option>
-                      <option value="Passive">Passive Reconnaissance</option>
-                      <option value="Active">Active Scanning</option>
-                      <option value="DNS">DNS & Domain</option>
-                      <option value="Web">Web Applications</option>
-                      <option value="Network">Network & Infrastructure</option>
-                      <option value="OSINT">Open Source Intelligence</option>
-                      <option value="Threat Intel">Threat Intelligence</option>
-                      <option value="Social">Social Networks</option>
-                      <option value="Search Engines">Search Engines</option>
-                      <option value="Secondary">Secondary Sources</option>
+                      <option value="">Filter by Category (All)</option>
                     </select>
                   </div>
                   <div class="col-md-6">
+                    <!-- Options are populated dynamically in
+                         populateUseCaseFilterOptions() from the live
+                         /modules payload's real 'group' (useCase) values
+                         -- see workspace_details.tmpl for why. -->
                     <select class="form-control form-control-sm" id="moduleUseCaseFilter">
-                      <option value="">Filter by Use Case</option>
-                      <option value="basic">Basic Discovery</option>
-                      <option value="comprehensive">Comprehensive Audit</option>
-                      <option value="stealth">Stealth Reconnaissance</option>
-                      <option value="threat">Threat Assessment</option>
-                      <option value="compliance">Compliance Check</option>
-                      <option value="monitoring">Continuous Monitoring</option>
+                      <option value="">Filter by Use Case (All)</option>
                     </select>
                   </div>
                 </div>
@@ -1224,18 +1216,25 @@ function loadAvailableModules() {
         if (data && Array.isArray(data)) {
             allModules = data;
             
-            // Group modules by category
+            // Group modules by category. module.cats is the real
+            // 'categories' field (e.g. "DNS", "Search Engines") --
+            // module.group is useCases ("Footprint"/"Investigate"/
+            // "Passive"), a different vocabulary that was mistakenly
+            // used here, making these headers show useCases mislabeled
+            // as categories.
             modulesByCategory = {};
             data.forEach(function(module) {
-                if (module.group && Array.isArray(module.group) && module.group.length > 0) {
-                    var category = module.group[0];
+                if (module.cats && Array.isArray(module.cats) && module.cats.length > 0) {
+                    var category = module.cats[0];
                     if (!modulesByCategory[category]) {
                         modulesByCategory[category] = [];
                     }
                     modulesByCategory[category].push(module);
                 }
             });
-            
+
+            populateCategoryFilterOptions(data);
+            populateUseCaseFilterOptions(data);
             displayModules();
             setupModuleFilters();
         } else {
@@ -1248,15 +1247,46 @@ function loadAvailableModules() {
     });
 }
 
+function populateDropdownFromField(modules, field, selector) {
+    var values = {};
+    modules.forEach(function(module) {
+        (module[field] || []).forEach(function(v) {
+            values[v] = true;
+        });
+    });
+
+    var sortedValues = Object.keys(values).sort();
+    var $select = $(selector);
+    var currentValue = $select.val();
+
+    $select.find('option[value!=""]').remove();
+    sortedValues.forEach(function(v) {
+        $select.append($('<option>').val(v).text(v));
+    });
+
+    if (currentValue && sortedValues.indexOf(currentValue) !== -1) {
+        $select.val(currentValue);
+    }
+}
+
+function populateCategoryFilterOptions(modules) {
+    populateDropdownFromField(modules, 'cats', '#moduleTypeFilter');
+}
+
+function populateUseCaseFilterOptions(modules) {
+    populateDropdownFromField(modules, 'group', '#moduleUseCaseFilter');
+}
+
 function displayModules(filteredModules) {
     var modulesToShow = filteredModules || allModules;
     var html = '';
     
-    // Group filtered modules by category
+    // Group filtered modules by category (module.cats, not module.group --
+    // see loadAvailableModules() above for why).
     var displayCategories = {};
     modulesToShow.forEach(function(module) {
-        if (module.group && Array.isArray(module.group) && module.group.length > 0) {
-            var category = module.group[0];
+        if (module.cats && Array.isArray(module.cats) && module.cats.length > 0) {
+            var category = module.cats[0];
             if (!displayCategories[category]) {
                 displayCategories[category] = [];
             }
@@ -1304,60 +1334,30 @@ function setupModuleFilters() {
 
 function applyModuleFilters(category, useCase) {
     var filteredModules = allModules;
-    
-    // Filter by category
-    if (category) {
-        filteredModules = filteredModules.filter(function(module) {
-            return module.group && module.group.some(function(group) {
-                return group.toLowerCase().includes(category.toLowerCase());
-            });
-        });
-    }
-    
-    // Filter by use case (based on module characteristics)
-    if (useCase) {
-        filteredModules = filteredModules.filter(function(module) {
-            return isModuleForUseCase(module, useCase);
-        });
-    }
-    
-    displayModules(filteredModules);
-}
 
-function isModuleForUseCase(module, useCase) {
-    var moduleName = module.name.toLowerCase();
-    var moduleDesc = (module.descr || '').toLowerCase();
-    var moduleGroup = (module.group || []).join(' ').toLowerCase();
-    
-    switch(useCase) {
-        case 'basic':
-            return moduleName.includes('dns') || moduleName.includes('whois') || 
-                   moduleName.includes('ssl') || moduleName.includes('header') ||
-                   moduleGroup.includes('dns') || moduleGroup.includes('passive');
-        
-        case 'comprehensive':
-            return true; // All modules for comprehensive scan
-        
-        case 'stealth':
-            return moduleGroup.includes('passive') || moduleGroup.includes('dns') ||
-                   moduleGroup.includes('search') || !moduleName.includes('scan');
-        
-        case 'threat':
-            return moduleGroup.includes('threat') || moduleGroup.includes('malware') ||
-                   moduleName.includes('virus') || moduleName.includes('threat') ||
-                   moduleName.includes('malware') || moduleName.includes('reputation');
-        
-        case 'compliance':
-            return moduleName.includes('ssl') || moduleName.includes('cert') ||
-                   moduleName.includes('header') || moduleName.includes('security');
-        
-        case 'monitoring':
-            return moduleGroup.includes('passive') || moduleGroup.includes('dns') ||
-                   moduleGroup.includes('monitoring') || !moduleName.includes('scan');
-        
-        default:
-            return true;
+    // Both dropdowns' options are now populated directly from the real
+    // module.cats / module.group values (see populateCategoryFilterOptions
+    // / populateUseCaseFilterOptions), so this is a straightforward
+    // case-insensitive substring match against the matching field --
+    // no more guessing, no more hardcoded option lists that can drift out
+    // of sync with what modules actually declare.
+    if (category) {
+        var needle = category.toLowerCase();
+        filteredModules = filteredModules.filter(function(module) {
+            var cats = (module.cats || []).map(function(c) { return String(c).toLowerCase(); });
+            return cats.join(' ').indexOf(needle) !== -1;
+        });
     }
+
+    if (useCase) {
+        var useCaseNeedle = useCase.toLowerCase();
+        filteredModules = filteredModules.filter(function(module) {
+            var groups = (module.group || []).map(function(g) { return String(g).toLowerCase(); });
+            return groups.join(' ').indexOf(useCaseNeedle) !== -1;
+        });
+    }
+
+    displayModules(filteredModules);
 }
 
 // Module preset functions

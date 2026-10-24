@@ -503,12 +503,18 @@ class EventManager:
                 f"sfEvent.risk value is {type(sfEvent.risk)}; "
                 f"expected 0 - 100"
             )
-        if (not isinstance(sfEvent.sourceEvent, SpiderFootEvent) and
-                sfEvent.eventType != "ROOT"):
-            raise TypeError(
-                f"sfEvent.sourceEvent is {type(sfEvent.sourceEvent)}; "
-                f"expected str()"
-            )
+        # Note: no separate check on sfEvent.sourceEvent itself here (there
+        # used to be one requiring it to be a real SpiderFootEvent for any
+        # non-ROOT eventType). SpiderFootEvent's own sourceEvent setter
+        # explicitly documents and supports sourceEvent=None for "testing
+        # or special cases", defaulting sourceEventHash to "ROOT" -- a
+        # legitimate, storable value used by e.g. sfp_advanced_correlation's
+        # scanFinished()-emitted aggregate events, which have no single
+        # parent event. That check rejected exactly this case with a
+        # TypeError whose own message didn't even match what it was
+        # checking ("expected str()" while testing isinstance(...,
+        # SpiderFootEvent)). What actually needs validating -- and gets
+        # stored -- is sourceEventHash, checked just below.
         if not isinstance(sfEvent.sourceEventHash, str):
             raise TypeError(
                 f"sfEvent.sourceEventHash is {type(sfEvent.sourceEventHash)}; "
@@ -519,8 +525,10 @@ class EventManager:
         storeData = sfEvent.data
         if isinstance(truncateSize, int) and truncateSize > 0:
             storeData = storeData[0:truncateSize]
-        # Always store generated as int (ms)
-        generated_ms = int(sfEvent.generated * 1000)
+        # generated is stored as whole seconds since epoch -- every reader
+        # of this column (ROUND(c.generated), TO_TIMESTAMP(generated),
+        # time.localtime() in search results) treats it as seconds, not ms.
+        generated_seconds = int(sfEvent.generated)
         ph = get_placeholder(self.db_type)
         qry = (
             f"INSERT INTO tbl_scan_results "
@@ -530,7 +538,7 @@ class EventManager:
             f"{ph}, {ph})"
         )
         qvals = [
-            instanceId, sfEvent.hash, sfEvent.eventType, generated_ms,
+            instanceId, sfEvent.hash, sfEvent.eventType, generated_seconds,
             sfEvent.confidence, sfEvent.visibility, sfEvent.risk,
             sfEvent.module, storeData, sfEvent.sourceEventHash
         ]
@@ -712,14 +720,15 @@ class EventManager:
         return datamap
 
     def get_sources(self, scan_id: str, event_hash: str) -> list:
-        qry = """
+        ph = get_placeholder(self.db_type)
+        qry = f"""
             SELECT s.hash, s.type, s.data, s.module, s.generated,
                    s.source_event_hash
             FROM tbl_scan_results c
             JOIN tbl_scan_results s
               ON c.source_event_hash = s.hash
-            WHERE c.scan_instance_id = ?
-              AND c.hash = ?
+            WHERE c.scan_instance_id = {ph}
+              AND c.hash = {ph}
               AND c.source_event_hash != 'ROOT'
         """
         qvars = [scan_id, event_hash]
@@ -744,12 +753,13 @@ class EventManager:
                 ) from e
 
     def get_entities(self, scan_id: str, event_hash: str) -> list:
-        qry = """
+        ph = get_placeholder(self.db_type)
+        qry = f"""
             SELECT c.hash, c.type, c.data, c.module, c.generated,
                    c.source_event_hash
             FROM tbl_scan_results c
-            WHERE c.scan_instance_id = ?
-              AND c.source_event_hash = ?
+            WHERE c.scan_instance_id = {ph}
+              AND c.source_event_hash = {ph}
               AND c.type IN (
                 SELECT event FROM tbl_event_types
                 WHERE event_type = 'ENTITY'
@@ -838,17 +848,19 @@ class EventManager:
         if 'start_date' in criteria and criteria['start_date']:
             qry += f" AND c.generated >= {ph}"
             start = criteria['start_date']
-            if start > 1000000000000:  # already ms
-                qvars.append(start)
+            # c.generated is stored in whole seconds; accept a ms-scale
+            # value from a caller too, same as end_date below.
+            if start > 1000000000000:
+                qvars.append(int(start / 1000))
             else:
-                qvars.append(int(start * 1000))
+                qvars.append(int(start))
         if 'end_date' in criteria and criteria['end_date']:
             qry += f" AND c.generated <= {ph}"
             end = criteria['end_date']
             if end > 1000000000000:
-                qvars.append(end)
+                qvars.append(int(end / 1000))
             else:
-                qvars.append(int(end * 1000))
+                qvars.append(int(end))
         if filterFp:
             qry += " AND c.false_positive <> 1"
         qry += " ORDER BY c.data"
